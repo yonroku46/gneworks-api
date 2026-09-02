@@ -1,0 +1,85 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.3.0'
+	id 'io.spring.dependency-management' version '1.1.5'
+}
+
+group = 'com.gneworks'
+version = '0.0.1'
+sourceCompatibility = '21'
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-aop'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+	implementation 'commons-codec:commons-codec:1.15'
+	implementation 'com.aventrix.jnanoid:jnanoid:2.0.0'
+	implementation 'com.github.ksuid:ksuid:1.1.0'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+
+	// DB
+	implementation 'com.jcraft:jsch:0.1.55'
+	runtimeOnly 'com.mysql:mysql-connector-j'
+
+	// GSON
+	implementation 'com.google.code.gson:gson:2.8.9'
+
+	// WEBP
+	implementation 'com.github.usefulness:webp-imageio:0.10.2'
+
+	// Image
+	implementation 'com.twelvemonkeys.imageio:imageio-core:3.8.1'
+	implementation 'com.twelvemonkeys.imageio:imageio-jpeg:3.8.1'
+	implementation 'com.twelvemonkeys.imageio:imageio-pnm:3.8.1'
+	implementation 'com.twelvemonkeys.imageio:imageio-tiff:3.8.1'
+	implementation 'com.twelvemonkeys.imageio:imageio-bmp:3.8.1'
+	implementation 'com.twelvemonkeys.imageio:imageio-metadata:3.8.1'
+
+	// aws
+	implementation 'com.amazonaws:aws-java-sdk-core:1.12.517'
+	implementation 'com.amazonaws:aws-java-sdk-s3:1.12.517'
+	implementation 'com.amazonaws:aws-java-sdk-secretsmanager:1.12.517'
+	implementation 'com.amazonaws:aws-java-sdk-ses:1.12.517'
+	implementation 'com.amazonaws:aws-java-sdk-ssm:1.12.517'
+
+	// jwt
+	implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
+	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.3'
+	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
+
+	// slf4j & logback
+	implementation 'org.slf4j:jcl-over-slf4j'
+	implementation 'ch.qos.logback:logback-classic'
+
+	// mybatis
+	implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3'
+}
+
+tasks.named('compileJava') {
+	options.compilerArgs += ["-Xlint:deprecation"]
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+	jvmArgs '-Xshare:off'
+}
+
+tasks.named('clean') {
+	delete('src/main/generated')
+}

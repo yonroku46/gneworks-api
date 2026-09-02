@@ -1,0 +1,33 @@
+server:
+  address: 127.0.0.1
+  port: 8080
+  viewport: 80
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://gne-db.cr8eu48iyehf.ap-northeast-2.rds.amazonaws.com:3306/gneworks?characterEncoding=UTF-8&serverTimezone=Asia/Tokyo
+    username: admin
+    password: gneworks2026
+
+security:
+  oauth2:
+    base: https://gneworks.com
+  jwt:
+    secret-key: ZnItc4ktcmRzLWJlbWFjMi6jbHVzdYVyLWNibXpmZmltbWV8eS5RcC1ub3J0aGVhc3QtMS5yZHMuYZ4hem6uYXdzLmNvbQ==
+
+cloud:
+  aws:
+    credentials:
+      accessKey: AKIATLWEPRRWAIXH3NXH
+      secretKey: ${AWS_SECRET_KEY:}
+    region:
+      auto: false
+      static: ap-northeast-2
+    s3:
+      bucketName: gneworks-com
+      prefix:
+        user: user/
+    ses:
+      admin: support@univus.jp
+      sender: GNEworks <no-reply@univus.jp>

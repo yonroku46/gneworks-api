@@ -1,0 +1,40 @@
+server:
+  address: localhost
+  port: 8080
+  viewport: 3000
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/gneworks?characterEncoding=UTF-8&serverTimezone=Asia/Tokyo
+    username: root
+    password: admin
+
+security:
+  oauth2:
+    base: http://${server.address}:${server.viewport}
+  jwt:
+    secret-key: ZnItc4ktcmRzLWJlbWFjMi6jbHVzdYVyLWNibXpmZmltbWV8eS5RcC1ub3J0aGVhc3QtMS5yZHMuYZ4hem6uYXdzLmNvbQ==
+
+cloud:
+  aws:
+    credentials:
+      accessKey: AKIATLWEPRRWAIXH3NXH
+      secretKey: ${AWS_SECRET_KEY:}
+    region:
+      auto: false
+      static: ap-northeast-2
+    s3:
+      bucketName: gneworks-com
+      prefix:
+        user: dev/user/
+    ses:
+      admin: support@univus.jp
+      sender: GNEworks <no-reply@univus.jp>
+
+logging:
+  level:
+    java.sql: debug
+    com.gneworks.dao.mapper: debug
+    org.mybatis: debug
+    org.apache.ibatis: debug
