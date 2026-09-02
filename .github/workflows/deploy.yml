@@ -35,7 +35,7 @@ jobs:
           username: ubuntu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
-          source: "build/libs/gnework-0.0.1.jar"
+          source: "build/libs/gneworks-0.0.1.jar"
           target: "/home/app-service/app-api/jar"
           strip_components: 2
 
