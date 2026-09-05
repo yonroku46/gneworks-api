@@ -25,21 +25,33 @@ public class BaseController {
     UserDao userDao;
 
     public User loadUser() {
-        User entity = new User();
-        String authorization = request.getHeader(SecurityConst.REFRESH_TOKEN_HEADER);
+        // 1. Authorization 헤더 우선 확인
+        String authorization = request.getHeader(SecurityConst.TOKEN_HEADER);
+        if (authorization == null || authorization.trim().isEmpty()) {
+            // 2. RefreshToken 헤더 확인
+            authorization = request.getHeader(SecurityConst.REFRESH_TOKEN_HEADER);
+        }
+
         if (authorization != null) {
-            String token = authorization.replace(SecurityConst.TOKEN_PREFIX, "");
-            Claims claims = JwtUtils.parseJWT(token);
-            Object userIdObj = claims.get("userId");
-            if (userIdObj != null) {
-                entity = userDao.findUser(userIdObj.toString());
+            try {
+                String token = authorization.replace(SecurityConst.TOKEN_PREFIX, "").trim();
+                Claims claims = JwtUtils.parseJWT(token);
+                Object userIdObj = claims.get("userId");
+                if (userIdObj != null) {
+                    User found = userDao.findUser(userIdObj.toString());
+                    if (found != null) {
+                        return found;
+                    }
+                }
+            } catch (Exception e) {
+                // 토큰 파싱 실패 시 빈 유저 반환
             }
         }
-        return entity;
+        return new User();
     }
 
     /**
-     * 로그인 중인 사용자명
+     * 로그인 중인 유저 이름
      *
      * @return
      */
@@ -49,7 +61,7 @@ public class BaseController {
     }
 
     /**
-     * 로그인 중인 사용자 ID
+     * 로그인 중인 유저 ID
      *
      * @return
      */

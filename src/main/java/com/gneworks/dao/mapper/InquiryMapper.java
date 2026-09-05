@@ -21,4 +21,8 @@ public interface InquiryMapper {
     int updateByPrimaryKey(Inquiry row);
     
     int saveInquiry(Inquiry row);
+    
+    int countPendingInquiries();
+    
+    Inquiry selectLatestPendingInquiry();
 }

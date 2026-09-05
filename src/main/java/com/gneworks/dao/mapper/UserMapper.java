@@ -26,7 +26,15 @@ public interface UserMapper {
 
     User findUser(@Param("userId") String userId);
 
+    List<User> selectAllActiveUsers();
+
     int updateProfile(User user);
+
+    int updateUserByAdmin(User user);
+
+    int updatePassword(@Param("userId") String userId, @Param("userPw") String userPw);
+
+    int softDeleteUser(@Param("userId") String userId);
 
     int updateLastLogin(@Param("userId") String userId);
 }

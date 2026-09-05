@@ -53,6 +53,74 @@ public class UserDao {
         }
     }
 
+    public List<User> selectAllActiveUsers() {
+        try {
+            return userMapper.selectAllActiveUsers();
+        } catch (Exception exception) {
+            final String methodName = "UserMapper#selectAllActiveUsers";
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, new HashMap<>(), exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public int insertUser(User user) {
+        try {
+            return userMapper.insert(user);
+        } catch (Exception exception) {
+            final String methodName = "UserMapper#insert";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("user", user);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public int updateUserByAdmin(User user) {
+        try {
+            return userMapper.updateUserByAdmin(user);
+        } catch (Exception exception) {
+            final String methodName = "UserMapper#updateUserByAdmin";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("user", user);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public int updatePassword(String userId, String userPw) {
+        try {
+            return userMapper.updatePassword(userId, userPw);
+        } catch (Exception exception) {
+            final String methodName = "UserMapper#updatePassword";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("userId", userId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public int softDeleteUser(String userId) {
+        try {
+            return userMapper.softDeleteUser(userId);
+        } catch (Exception exception) {
+            final String methodName = "UserMapper#softDeleteUser";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("userId", userId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
     public int updateProfile(User user) {
         try {
             return userMapper.updateProfile(user);

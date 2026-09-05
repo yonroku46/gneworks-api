@@ -80,6 +80,8 @@
     select inquiry_id, user_id, inquiry_type, phone_num, user_name, answer_user_name, 
     create_time, answer_time, processed_flg, delete_flg, inquiry_contents, answer_contents
     from inquiry
+    where coalesce(delete_flg, 0) = 0
+    order by create_time desc
   </select>
   <insert id="saveInquiry" parameterType="com.gneworks.dao.entity.Inquiry">
     insert into inquiry
@@ -91,4 +93,19 @@
       #{phoneNum,jdbcType=VARCHAR}, #{inquiryContents,jdbcType=LONGVARCHAR}, #{userName,jdbcType=VARCHAR},
       DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR))
   </insert>
+  <select id="countPendingInquiries" resultType="java.lang.Integer">
+    select count(*)
+    from inquiry
+    where coalesce(delete_flg, 0) = 0
+      and coalesce(processed_flg, 0) = 0
+  </select>
+  <select id="selectLatestPendingInquiry" resultMap="BaseResultMap">
+    select inquiry_id, user_id, inquiry_type, phone_num, user_name, answer_user_name, 
+    create_time, answer_time, processed_flg, delete_flg, inquiry_contents, answer_contents
+    from inquiry
+    where coalesce(delete_flg, 0) = 0
+      and coalesce(processed_flg, 0) = 0
+    order by create_time desc
+    limit 1
+  </select>
 </mapper>

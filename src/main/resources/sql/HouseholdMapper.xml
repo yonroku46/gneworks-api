@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gneworks.dao.mapper.HouseholdMapper">
+  <resultMap id="BaseResultMap" type="com.gneworks.dao.entity.Household">
+    <id column="household_id" jdbcType="CHAR" property="householdId" />
+    <result column="site_id" jdbcType="CHAR" property="siteId" />
+    <result column="dong" jdbcType="VARCHAR" property="dong" />
+    <result column="ho" jdbcType="VARCHAR" property="ho" />
+    <result column="head_name" jdbcType="VARCHAR" property="headName" />
+    <result column="target_type" jdbcType="VARCHAR" property="targetType" />
+    <result column="install_status" jdbcType="VARCHAR" property="installStatus" />
+    <result column="remarks" jdbcType="VARCHAR" property="remarks" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+  </resultMap>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.String">
+    delete from household
+    where household_id = #{householdId,jdbcType=CHAR}
+  </delete>
+
+  <delete id="deleteBySiteId" parameterType="java.lang.String">
+    delete from household
+    where site_id = #{siteId,jdbcType=CHAR}
+  </delete>
+
+  <insert id="insert" parameterType="com.gneworks.dao.entity.Household">
+    insert into household (household_id, site_id, dong, 
+      ho, head_name, target_type, 
+      install_status, remarks, create_time)
+    values (#{householdId,jdbcType=CHAR}, #{siteId,jdbcType=CHAR}, #{dong,jdbcType=VARCHAR}, 
+      #{ho,jdbcType=VARCHAR}, #{headName,jdbcType=VARCHAR}, #{targetType,jdbcType=VARCHAR}, 
+      #{installStatus,jdbcType=VARCHAR}, #{remarks,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP})
+  </insert>
+
+  <update id="updateByPrimaryKey" parameterType="com.gneworks.dao.entity.Household">
+    update household
+    set site_id = #{siteId,jdbcType=CHAR},
+      dong = #{dong,jdbcType=VARCHAR},
+      ho = #{ho,jdbcType=VARCHAR},
+      head_name = #{headName,jdbcType=VARCHAR},
+      target_type = #{targetType,jdbcType=VARCHAR},
+      install_status = #{installStatus,jdbcType=VARCHAR},
+      remarks = #{remarks,jdbcType=VARCHAR},
+      create_time = #{createTime,jdbcType=TIMESTAMP}
+    where household_id = #{householdId,jdbcType=CHAR}
+  </update>
+
+  <select id="selectByPrimaryKey" parameterType="java.lang.String" resultMap="BaseResultMap">
+    select household_id, site_id, dong, ho, head_name, target_type, install_status, remarks, 
+    create_time
+    from household
+    where household_id = #{householdId,jdbcType=CHAR}
+  </select>
+
+  <select id="selectAll" resultMap="BaseResultMap">
+    select household_id, site_id, dong, ho, head_name, target_type, install_status, remarks, 
+    create_time
+    from household
+  </select>
+
+  <select id="selectBySiteId" parameterType="java.lang.String" resultMap="BaseResultMap">
+    select household_id, site_id, dong, ho, head_name, target_type, install_status, remarks, 
+    create_time
+    from household
+    where site_id = #{siteId,jdbcType=CHAR}
+    order by dong asc, ho asc
+  </select>
+</mapper>

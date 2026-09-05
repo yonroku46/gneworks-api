@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gneworks.dao.mapper.SiteMapper">
+  <resultMap id="BaseResultMap" type="com.gneworks.dao.entity.Site">
+    <id column="site_id" jdbcType="CHAR" property="siteId" />
+    <result column="region_id" jdbcType="CHAR" property="regionId" />
+    <result column="name" jdbcType="VARCHAR" property="name" />
+    <result column="region" jdbcType="VARCHAR" property="region" />
+    <result column="address" jdbcType="VARCHAR" property="address" />
+    <result column="sido" jdbcType="VARCHAR" property="sido" />
+    <result column="sigungu" jdbcType="VARCHAR" property="sigungu" />
+    <result column="eupmyeondong" jdbcType="VARCHAR" property="eupmyeondong" />
+    <result column="contact_phone" jdbcType="VARCHAR" property="contactPhone" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+  </resultMap>
+
+  <!-- 현장 목록 조회용 ResultMap -->
+  <resultMap id="SiteListResultMap" type="com.gneworks.dto.res.AdminSiteRes">
+    <id column="site_id" property="siteId" />
+    <result column="region_id" property="regionId" />
+    <result column="name" property="name" />
+    <result column="region" property="region" />
+    <result column="address" property="address" />
+    <result column="sido" property="sido" />
+    <result column="sigungu" property="sigungu" />
+    <result column="eupmyeondong" property="eupmyeondong" />
+    <result column="contact_phone" property="contactPhone" />
+    <result column="create_time" property="createTime" />
+    <result column="total_households" property="totalHouseholds" />
+    <result column="dong_count" property="dongCount" />
+    <result column="completed_households" property="completedHouseholds" />
+  </resultMap>
+
+  <!-- 현장 상세 조회용 ResultMap (세대 목록 컬렉션 포함) -->
+  <resultMap id="SiteDetailResultMap" type="com.gneworks.dto.res.AdminSiteRes">
+    <id column="site_id" property="siteId" />
+    <result column="region_id" property="regionId" />
+    <result column="name" property="name" />
+    <result column="region" property="region" />
+    <result column="address" property="address" />
+    <result column="sido" property="sido" />
+    <result column="sigungu" property="sigungu" />
+    <result column="eupmyeondong" property="eupmyeondong" />
+    <result column="contact_phone" property="contactPhone" />
+    <result column="create_time" property="createTime" />
+    <result column="total_households" property="totalHouseholds" />
+    <result column="dong_count" property="dongCount" />
+    <result column="completed_households" property="completedHouseholds" />
+    <collection property="households" ofType="com.gneworks.dao.entity.Household" notNullColumn="hh_id">
+      <id column="hh_id" property="householdId" />
+      <result column="hh_site_id" property="siteId" />
+      <result column="hh_dong" property="dong" />
+      <result column="hh_ho" property="ho" />
+      <result column="hh_head_name" property="headName" />
+      <result column="hh_target_type" property="targetType" />
+      <result column="hh_install_status" property="installStatus" />
+      <result column="hh_remarks" property="remarks" />
+      <result column="hh_create_time" property="createTime" />
+    </collection>
+  </resultMap>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.String">
+    delete from site
+    where site_id = #{siteId,jdbcType=CHAR}
+  </delete>
+
+  <insert id="insert" parameterType="com.gneworks.dao.entity.Site">
+    insert into site (site_id, region_id, name, 
+      region, address, sido, 
+      sigungu, eupmyeondong, contact_phone, 
+      create_time)
+    values (#{siteId,jdbcType=CHAR}, #{regionId,jdbcType=CHAR}, #{name,jdbcType=VARCHAR}, 
+      #{region,jdbcType=VARCHAR}, #{address,jdbcType=VARCHAR}, #{sido,jdbcType=VARCHAR}, 
+      #{sigungu,jdbcType=VARCHAR}, #{eupmyeondong,jdbcType=VARCHAR}, #{contactPhone,jdbcType=VARCHAR}, 
+      #{createTime,jdbcType=TIMESTAMP})
+  </insert>
+
+  <update id="updateByPrimaryKey" parameterType="com.gneworks.dao.entity.Site">
+    update site
+    set region_id = #{regionId,jdbcType=CHAR},
+      name = #{name,jdbcType=VARCHAR},
+      region = #{region,jdbcType=VARCHAR},
+      address = #{address,jdbcType=VARCHAR},
+      sido = #{sido,jdbcType=VARCHAR},
+      sigungu = #{sigungu,jdbcType=VARCHAR},
+      eupmyeondong = #{eupmyeondong,jdbcType=VARCHAR},
+      contact_phone = #{contactPhone,jdbcType=VARCHAR}
+    where site_id = #{siteId,jdbcType=CHAR}
+  </update>
+
+  <select id="selectByPrimaryKey" parameterType="java.lang.String" resultMap="BaseResultMap">
+    select site_id, region_id, name, region, address, sido, sigungu, eupmyeondong, 
+    contact_phone, create_time
+    from site
+    where site_id = #{siteId,jdbcType=CHAR}
+  </select>
+
+  <select id="selectAll" resultMap="BaseResultMap">
+    select site_id, region_id, name, region, address, sido, sigungu, eupmyeondong, 
+    contact_phone, create_time
+    from site
+  </select>
+
+  <!-- 현장 목록 조회 (필터 및 동수, 세대수 집계) -->
+  <select id="selectSiteList" resultMap="SiteListResultMap">
+    select 
+      s.site_id, s.region_id, s.name, s.region, s.address, s.sido, s.sigungu, s.eupmyeondong,
+      s.contact_phone, s.create_time,
+      count(h.household_id) as total_households,
+      count(distinct h.dong) as dong_count,
+      count(case when h.install_status = 'INSTALLED' then 1 end) as completed_households
+    from site s
+    left join household h on s.site_id = h.site_id
+    <where>
+      <if test="sido != null and sido != '' and sido != 'ALL'">
+        and s.sido = #{sido}
+      </if>
+      <if test="sigungu != null and sigungu != '' and sigungu != 'ALL'">
+        and (
+          s.sigungu = #{sigungu}
+          or s.sigungu like concat(#{sigungu}, '%')
+          or #{sigungu} like concat(s.sigungu, '%')
+          or s.region = #{sigungu}
+          or s.region like concat(#{sigungu}, '%')
+        )
+      </if>
+      <if test="eupmyeondong != null and eupmyeondong != '' and eupmyeondong != 'ALL'">
+        and s.eupmyeondong like concat('%', #{eupmyeondong}, '%')
+      </if>
+      <if test="query != null and query != ''">
+        and (s.name like concat('%', #{query}, '%') or s.address like concat('%', #{query}, '%'))
+      </if>
+    </where>
+    group by s.site_id
+    order by s.create_time desc
+  </select>
+
+  <!-- 현장 상세 조회 (세대 목록 컬렉션 포함) -->
+  <select id="selectSiteDetailWithHouseholds" parameterType="java.lang.String" resultMap="SiteDetailResultMap">
+    select 
+      s.site_id, s.region_id, s.name, s.region, s.address, s.sido, s.sigungu, s.eupmyeondong,
+      s.contact_phone, s.create_time,
+      h.household_id as hh_id,
+      h.site_id as hh_site_id,
+      h.dong as hh_dong,
+      h.ho as hh_ho,
+      h.head_name as hh_head_name,
+      h.target_type as hh_target_type,
+      h.install_status as hh_install_status,
+      h.remarks as hh_remarks,
+      h.create_time as hh_create_time,
+      (select count(*) from household where site_id = s.site_id) as total_households,
+      (select count(distinct dong) from household where site_id = s.site_id) as dong_count,
+      (select count(*) from household where site_id = s.site_id and install_status = 'INSTALLED') as completed_households
+    from site s
+    left join household h on s.site_id = h.site_id
+    where s.site_id = #{siteId}
+    order by h.dong asc, h.ho asc
+  </select>
+</mapper>

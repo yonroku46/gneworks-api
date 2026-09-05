@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gneworks.dao.mapper.UserAssignedRegionMapper">
+  <resultMap id="BaseResultMap" type="com.gneworks.dao.entity.UserAssignedRegion">
+    <id column="assigned_region_id" jdbcType="CHAR" property="assignedRegionId" />
+    <result column="user_id" jdbcType="CHAR" property="userId" />
+    <result column="region_id" jdbcType="VARCHAR" property="regionId" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+  </resultMap>
+
+  <!-- 지역 담당 작업자 목록 조회용 ResultMap (MyBatis Collection 매핑) -->
+  <resultMap id="RegionWorkerResultMap" type="com.gneworks.dto.res.RegionWorkerRes">
+    <id column="user_id" property="userId" />
+    <result column="user_name" property="userName" />
+    <result column="phone_num" property="phoneNum" />
+    <result column="profile_img" property="profileImg" />
+    <result column="last_updated" property="lastUpdated" />
+    <result column="create_time" property="createTime" />
+    <collection property="assignedRegions" ofType="com.gneworks.dto.res.UserAssignedRegionDetailRes" notNullColumn="assigned_region_id">
+      <id column="assigned_region_id" property="assignedRegionId" />
+      <result column="assigned_user_id" property="userId" />
+      <result column="region_id" property="regionId" />
+      <result column="sido_name" property="sido" />
+      <result column="region_name" property="sigungu" />
+      <result column="assigned_date" property="assignedDate" />
+    </collection>
+  </resultMap>
+
+  <!-- 단일 작업자의 배정지역 상세 ResultMap -->
+  <resultMap id="UserAssignedRegionDetailResultMap" type="com.gneworks.dto.res.UserAssignedRegionDetailRes">
+    <id column="assigned_region_id" property="assignedRegionId" />
+    <result column="user_id" property="userId" />
+    <result column="region_id" property="regionId" />
+    <result column="sido" property="sido" />
+    <result column="sigungu" property="sigungu" />
+    <result column="assigned_date" property="assignedDate" />
+  </resultMap>
+
+  <insert id="insert" parameterType="com.gneworks.dao.entity.UserAssignedRegion">
+    insert into user_assigned_region (assigned_region_id, user_id, region_id, create_time)
+    values (#{assignedRegionId,jdbcType=CHAR}, #{userId,jdbcType=CHAR}, #{regionId,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP})
+  </insert>
+
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.String">
+    delete from user_assigned_region
+    where assigned_region_id = #{assignedRegionId,jdbcType=CHAR}
+  </delete>
+
+  <delete id="deleteByUserIdAndRegionId">
+    delete from user_assigned_region
+    where user_id = #{userId} and region_id = #{regionId}
+  </delete>
+
+  <delete id="deleteByUserId" parameterType="java.lang.String">
+    delete from user_assigned_region
+    where user_id = #{userId}
+  </delete>
+
+  <select id="selectAll" resultMap="BaseResultMap">
+    select assigned_region_id, user_id, region_id, create_time
+    from user_assigned_region
+  </select>
+
+  <!-- 특정 작업자의 배정 관할 목록 조회 -->
+  <select id="selectAssignedRegionsByUserId" parameterType="java.lang.String" resultMap="UserAssignedRegionDetailResultMap">
+    select 
+      uar.assigned_region_id,
+      uar.user_id,
+      uar.region_id,
+      fr.sido_name as sido,
+      fr.name as sigungu,
+      date_format(uar.create_time, '%Y.%m.%d') as assigned_date
+    from user_assigned_region uar
+    inner join fire_region fr on uar.region_id = fr.region_id
+    where uar.user_id = #{userId}
+    order by uar.create_time asc
+  </select>
+
+  <!-- 특정 지역(시도, 시군구, 관할ID)을 담당하는 작업자 및 그들의 전체 배정관할 컬렉션 조회 -->
+  <select id="selectRegionWorkers" resultMap="RegionWorkerResultMap">
+    select 
+      u.user_id,
+      u.user_name,
+      u.phone_num,
+      u.profile_img,
+      date_format(u.last_update, '%Y-%m-%d %H:%i:%s') as last_updated,
+      date_format(u.last_update, '%Y-%m-%d %H:%i:%s') as create_time,
+      all_uar.assigned_region_id,
+      all_uar.user_id as assigned_user_id,
+      all_uar.region_id,
+      all_fr.sido_name,
+      all_fr.name as region_name,
+      date_format(all_uar.create_time, '%Y.%m.%d') as assigned_date
+    from user u
+    inner join user_assigned_region target_uar on u.user_id = target_uar.user_id
+    inner join fire_region target_fr on target_uar.region_id = target_fr.region_id
+    left join user_assigned_region all_uar on u.user_id = all_uar.user_id
+    left join fire_region all_fr on all_uar.region_id = all_fr.region_id
+    where u.delete_flg = 0
+      and u.role_id = 1
+      <choose>
+        <when test="regionId != null and regionId != ''">
+          and target_uar.region_id = #{regionId}
+        </when>
+        <otherwise>
+          <if test="sido != null and sido != '' and sido != 'ALL'">
+            and target_fr.sido_name = #{sido}
+          </if>
+          <if test="sigungu != null and sigungu != '' and sigungu != 'ALL'">
+            and target_fr.name = #{sigungu}
+          </if>
+        </otherwise>
+      </choose>
+    order by u.last_update desc, all_uar.create_time asc
+  </select>
+</mapper>

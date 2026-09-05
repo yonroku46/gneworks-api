@@ -51,6 +51,20 @@ public class InquiryDao {
         }
     }
 
+    public Inquiry selectByPrimaryKey(String inquiryId) {
+        try {
+            return inquiryMapper.selectByPrimaryKey(inquiryId);
+        } catch (Exception exception) {
+            final String methodName = "InquiryMapper#selectByPrimaryKey";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("inquiryId", inquiryId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
     public int updateByPrimaryKey(Inquiry inquiry) {
         try {
             return inquiryMapper.updateByPrimaryKey(inquiry);
@@ -74,6 +88,30 @@ public class InquiryDao {
             paramMap.put("inquiryId", inquiryId);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public int countPendingInquiries() {
+        try {
+            return inquiryMapper.countPendingInquiries();
+        } catch (Exception exception) {
+            final String methodName = "InquiryMapper#countPendingInquiries";
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, null, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public Inquiry selectLatestPendingInquiry() {
+        try {
+            return inquiryMapper.selectLatestPendingInquiry();
+        } catch (Exception exception) {
+            final String methodName = "InquiryMapper#selectLatestPendingInquiry";
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, null, exception);
             log.error(overview + detail);
             throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
         }
