@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gneworks.dao.mapper.WorkReportMapper">
+  <resultMap id="BaseResultMap" type="com.gneworks.dao.entity.WorkReport">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    <id column="report_id" jdbcType="CHAR" property="reportId" />
+    <result column="household_id" jdbcType="CHAR" property="householdId" />
+    <result column="site_id" jdbcType="CHAR" property="siteId" />
+    <result column="user_id" jdbcType="CHAR" property="userId" />
+    <result column="dong" jdbcType="VARCHAR" property="dong" />
+    <result column="ho" jdbcType="VARCHAR" property="ho" />
+    <result column="head_name" jdbcType="VARCHAR" property="headName" />
+    <result column="install_date" jdbcType="DATE" property="installDate" />
+    <result column="report_time" jdbcType="TIMESTAMP" property="reportTime" />
+    <result column="reporter_name" jdbcType="VARCHAR" property="reporterName" />
+    <result column="confirmer_name" jdbcType="VARCHAR" property="confirmerName" />
+    <result column="confirmer_signature" jdbcType="VARCHAR" property="confirmerSignature" />
+    <result column="photo_door" jdbcType="VARCHAR" property="photoDoor" />
+    <result column="photo_before1" jdbcType="VARCHAR" property="photoBefore1" />
+    <result column="photo_after1" jdbcType="VARCHAR" property="photoAfter1" />
+    <result column="photo_before2" jdbcType="VARCHAR" property="photoBefore2" />
+    <result column="photo_after2" jdbcType="VARCHAR" property="photoAfter2" />
+    <result column="status" jdbcType="VARCHAR" property="status" />
+    <result column="remarks" jdbcType="VARCHAR" property="remarks" />
+    <result column="last_update" jdbcType="TIMESTAMP" property="lastUpdate" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="delete_flg" jdbcType="BIT" property="deleteFlg" />
+    <result column="fix_reason" jdbcType="LONGVARCHAR" property="fixReason" />
+  </resultMap>
+  <sql id="Base_Column_List">
+    report_id, household_id, site_id, user_id, dong, ho, head_name, install_date,
+    report_time, reporter_name, confirmer_name, confirmer_signature, photo_door, photo_before1,
+    photo_after1, photo_before2, photo_after2, `status`, remarks, last_update, create_time,
+    delete_flg, fix_reason
+  </sql>
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.String">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    delete from work_report
+    where report_id = #{reportId,jdbcType=CHAR}
+  </delete>
+  <insert id="insert" parameterType="com.gneworks.dao.entity.WorkReport">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    insert into work_report (report_id, household_id, site_id, 
+      user_id, dong, ho, head_name, 
+      install_date, report_time, reporter_name, 
+      confirmer_name, confirmer_signature, photo_door, 
+      photo_before1, photo_after1, photo_before2, 
+      photo_after2, `status`, remarks, 
+      last_update, create_time, delete_flg, 
+      fix_reason)
+    values (#{reportId,jdbcType=CHAR}, #{householdId,jdbcType=CHAR}, #{siteId,jdbcType=CHAR}, 
+      #{userId,jdbcType=CHAR}, #{dong,jdbcType=VARCHAR}, #{ho,jdbcType=VARCHAR}, #{headName,jdbcType=VARCHAR}, 
+      #{installDate,jdbcType=DATE}, #{reportTime,jdbcType=TIMESTAMP}, #{reporterName,jdbcType=VARCHAR}, 
+      #{confirmerName,jdbcType=VARCHAR}, #{confirmerSignature,jdbcType=VARCHAR}, #{photoDoor,jdbcType=VARCHAR}, 
+      #{photoBefore1,jdbcType=VARCHAR}, #{photoAfter1,jdbcType=VARCHAR}, #{photoBefore2,jdbcType=VARCHAR}, 
+      #{photoAfter2,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR}, #{remarks,jdbcType=VARCHAR}, 
+      #{lastUpdate,jdbcType=TIMESTAMP}, #{createTime,jdbcType=TIMESTAMP}, #{deleteFlg,jdbcType=BIT}, 
+      #{fixReason,jdbcType=LONGVARCHAR})
+  </insert>
+  <update id="updateByPrimaryKey" parameterType="com.gneworks.dao.entity.WorkReport">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    update work_report
+    set household_id = #{householdId,jdbcType=CHAR},
+      site_id = #{siteId,jdbcType=CHAR},
+      user_id = #{userId,jdbcType=CHAR},
+      dong = #{dong,jdbcType=VARCHAR},
+      ho = #{ho,jdbcType=VARCHAR},
+      head_name = #{headName,jdbcType=VARCHAR},
+      install_date = #{installDate,jdbcType=DATE},
+      report_time = #{reportTime,jdbcType=TIMESTAMP},
+      reporter_name = #{reporterName,jdbcType=VARCHAR},
+      confirmer_name = #{confirmerName,jdbcType=VARCHAR},
+      confirmer_signature = #{confirmerSignature,jdbcType=VARCHAR},
+      photo_door = #{photoDoor,jdbcType=VARCHAR},
+      photo_before1 = #{photoBefore1,jdbcType=VARCHAR},
+      photo_after1 = #{photoAfter1,jdbcType=VARCHAR},
+      photo_before2 = #{photoBefore2,jdbcType=VARCHAR},
+      photo_after2 = #{photoAfter2,jdbcType=VARCHAR},
+      `status` = #{status,jdbcType=VARCHAR},
+      remarks = #{remarks,jdbcType=VARCHAR},
+      last_update = #{lastUpdate,jdbcType=TIMESTAMP},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      delete_flg = #{deleteFlg,jdbcType=BIT},
+      fix_reason = #{fixReason,jdbcType=LONGVARCHAR}
+    where report_id = #{reportId,jdbcType=CHAR}
+  </update>
+  <select id="selectByPrimaryKey" parameterType="java.lang.String" resultMap="BaseResultMap">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    select report_id, household_id, site_id, user_id, dong, ho, head_name, install_date, 
+    report_time, reporter_name, confirmer_name, confirmer_signature, photo_door, photo_before1, 
+    photo_after1, photo_before2, photo_after2, `status`, remarks, last_update, create_time, 
+    delete_flg, fix_reason
+    from work_report
+    where report_id = #{reportId,jdbcType=CHAR}
+  </select>
+  <select id="selectAll" resultMap="BaseResultMap">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    select report_id, household_id, site_id, user_id, dong, ho, head_name, install_date, 
+    report_time, reporter_name, confirmer_name, confirmer_signature, photo_door, photo_before1, 
+    photo_after1, photo_before2, photo_after2, `status`, remarks, last_update, create_time, 
+    delete_flg, fix_reason
+    from work_report
+  </select>
+  <update id="updateByHouseholdId" parameterType="com.gneworks.dao.entity.WorkReport">
+    update work_report
+    set site_id = #{siteId,jdbcType=CHAR},
+      user_id = #{userId,jdbcType=CHAR},
+      dong = #{dong,jdbcType=VARCHAR},
+      ho = #{ho,jdbcType=VARCHAR},
+      head_name = #{headName,jdbcType=VARCHAR},
+      install_date = #{installDate,jdbcType=DATE},
+      report_time = #{reportTime,jdbcType=TIMESTAMP},
+      reporter_name = #{reporterName,jdbcType=VARCHAR},
+      confirmer_name = #{confirmerName,jdbcType=VARCHAR},
+      confirmer_signature = #{confirmerSignature,jdbcType=VARCHAR},
+      photo_door = #{photoDoor,jdbcType=VARCHAR},
+      photo_before1 = #{photoBefore1,jdbcType=VARCHAR},
+      photo_after1 = #{photoAfter1,jdbcType=VARCHAR},
+      photo_before2 = #{photoBefore2,jdbcType=VARCHAR},
+      photo_after2 = #{photoAfter2,jdbcType=VARCHAR},
+      `status` = #{status,jdbcType=VARCHAR},
+      remarks = #{remarks,jdbcType=VARCHAR},
+      last_update = #{lastUpdate,jdbcType=TIMESTAMP},
+      delete_flg = #{deleteFlg,jdbcType=BIT},
+      fix_reason = #{fixReason,jdbcType=LONGVARCHAR}
+    where household_id = #{householdId,jdbcType=CHAR}
+  </update>
+  <select id="selectByHouseholdId" parameterType="java.lang.String" resultMap="BaseResultMap">
+    select <include refid="Base_Column_List" />
+    from work_report
+    where household_id = #{householdId,jdbcType=CHAR}
+      and delete_flg = 0
+    limit 1
+  </select>
+  <select id="selectBySiteId" parameterType="java.lang.String" resultMap="BaseResultMap">
+    select <include refid="Base_Column_List" />
+    from work_report
+    where site_id = #{siteId,jdbcType=CHAR}
+      and delete_flg = 0
+    order by dong asc, ho asc
+  </select>
+  <select id="selectByUserId" parameterType="java.lang.String" resultMap="BaseResultMap">
+    select <include refid="Base_Column_List" />
+    from work_report
+    where user_id = #{userId,jdbcType=CHAR}
+      and delete_flg = 0
+    order by create_time desc
+  </select>
+</mapper>

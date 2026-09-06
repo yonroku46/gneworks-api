@@ -176,6 +176,20 @@ public class SiteDao {
         }
     }
 
+    public List<Household> selectHouseholdsBySiteId(String siteId) {
+        try {
+            return householdMapper.selectBySiteId(siteId);
+        } catch (Exception exception) {
+            final String methodName = "HouseholdMapper#selectBySiteId";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("siteId", siteId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
     // ── [3. FireRegion] ─────────────────────────────────────
 
     public List<FireRegion> selectAllFireRegions() {

@@ -28,6 +28,7 @@ cloud:
       bucketName: gneworks-com
       prefix:
         user: dev/user/
+        report: dev/report/
     ses:
       admin: support@univus.jp
       sender: GNEworks <no-reply@univus.jp>
