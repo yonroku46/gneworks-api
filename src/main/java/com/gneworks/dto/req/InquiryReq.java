@@ -19,4 +19,6 @@ public class InquiryReq extends ResponseData {
     private String inquiryType;
 
     private String inquiryContents;
+
+    private String website;
 }

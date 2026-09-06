@@ -40,6 +40,15 @@ public class ContactService {
     public BaseResponse sendInquiry(String userId, InquiryReq req) {
         ActionRes res = new ActionRes();
 
+        // 허니팟 필드에 값이 채워져 있으면 자동화된 스팸 봇으로 간주
+        if (req.getWebsite() != null && !req.getWebsite().trim().isEmpty()) {
+            log.warn("[BOT_DETECTED] Honeypot triggered in inquiry submission. Discarding silently. Value: '{}'", req.getWebsite());
+            res.setSuccess(Boolean.TRUE);
+            res.setId("BOT_" + KsuidGenerator.createId());
+            return ResponseUtils.generateDtoSuccess(new Information(MessageIdConst.I_INSERT_SUCCESS,
+                    messageSource.getMessage(MessageIdConst.I_INSERT_SUCCESS, new String[] { "Inquiry" }, LocaleAspect.LOCALE)), res);
+        }
+
         Inquiry inquiry = new Inquiry();
         String inquiryId = KsuidGenerator.createId();
         inquiry.setInquiryId(inquiryId);
