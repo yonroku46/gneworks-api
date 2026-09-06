@@ -25,4 +25,6 @@ public interface InquiryMapper {
     int countPendingInquiries();
     
     Inquiry selectLatestPendingInquiry();
+
+    List<Inquiry> selectByUserId(String userId);
 }

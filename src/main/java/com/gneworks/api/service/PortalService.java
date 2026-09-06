@@ -6,14 +6,19 @@ import com.gneworks.common.constants.MessageIdConst;
 import com.gneworks.common.id.KsuidGenerator;
 import com.gneworks.common.utils.ResponseUtils;
 import com.gneworks.common.utils.S3Utils;
+import com.gneworks.common.utils.StringUtils;
+import com.gneworks.dao.InquiryDao;
 import com.gneworks.dao.SiteDao;
 import com.gneworks.dao.UserDao;
+import com.gneworks.dao.WorkReportDao;
 import com.gneworks.dao.entity.FireRegion;
 import com.gneworks.dao.entity.Household;
+import com.gneworks.dao.entity.Inquiry;
 import com.gneworks.dao.entity.User;
 import com.gneworks.dao.entity.UserAssignedRegion;
 import com.gneworks.dto.res.ActionRes;
 import com.gneworks.dto.res.AdminSiteRes;
+import com.gneworks.dto.res.HouseholdRes;
 import com.gneworks.dto.res.ListRes;
 import com.gneworks.dto.res.UserAssignedRegionDetailRes;
 import com.gneworks.dto.res.UserRes;
@@ -28,6 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.gneworks.dao.entity.WorkReport;
+import com.gneworks.dto.req.AdminReportSearchReq;
 import com.gneworks.dto.req.WorkReportReq;
 import com.gneworks.dto.res.WorkReportRes;
 
@@ -35,8 +41,12 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -54,7 +64,10 @@ public class PortalService {
     private SiteDao siteDao;
 
     @Autowired
-    private com.gneworks.dao.WorkReportDao workReportDao;
+    private WorkReportDao workReportDao;
+
+    @Autowired
+    private InquiryDao inquiryDao;
 
     @Autowired
     private AmazonS3 amazonS3;
@@ -114,6 +127,8 @@ public class PortalService {
             user.setPhoneNum((String) updates.get("phoneNum"));
         }
 
+        String oldProfileImgToDelete = null;
+
         if (updates.containsKey("profileImg")) {
             String profileImg = (String) updates.get("profileImg");
             if (profileImg != null && profileImg.startsWith("data:image")) {
@@ -122,23 +137,44 @@ public class PortalService {
                     String header = parts[0];
                     String base64Data = parts[1];
                     String contentType = header.substring(header.indexOf(":") + 1, header.indexOf(";"));
-                    String extension = contentType.split("/")[1];
+                    String extension = contentType.contains("/") ? contentType.split("/")[1] : "webp";
                     byte[] bytes = Base64.getDecoder().decode(base64Data);
 
+                    String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
                     String separator = userPrefix.endsWith("/") ? "" : "/";
-                    String fileName = userPrefix + separator + userId + "_" + System.currentTimeMillis() + "." + extension;
+                    String fileName = userPrefix + separator + userId + "_" + timeStamp + "." + extension;
                     String s3Path = "/" + S3Utils.uploadFile(fileName, bytes, contentType, amazonS3);
+
+                    // 새 사진 업로드 성공 시, 이전 S3 사진을 삭제 대상으로 예약
+                    if (user.getProfileImg() != null && !user.getProfileImg().trim().isEmpty() && !user.getProfileImg().startsWith("data:image")) {
+                        oldProfileImgToDelete = user.getProfileImg();
+                    }
                     user.setProfileImg(s3Path);
                 } catch (Exception e) {
                     log.error("Failed to upload profile image to S3 for user: {}", userId, e);
                     return ResponseUtils.generateDtoFailed(new Information("IMAGE_UPLOAD_FAILED", "Failed to upload profile image"));
                 }
             } else {
+                if (profileImg == null || profileImg.trim().isEmpty()) {
+                    if (user.getProfileImg() != null && !user.getProfileImg().trim().isEmpty() && !user.getProfileImg().startsWith("data:image")) {
+                        oldProfileImgToDelete = user.getProfileImg();
+                    }
+                }
                 user.setProfileImg(profileImg);
             }
         }
 
         userDao.updateProfile(user);
+
+        // DB 저장까지 성공한 후 이전 프로필 사진을 안전하게 S3에서 삭제
+        if (oldProfileImgToDelete != null) {
+            try {
+                String oldS3Key = oldProfileImgToDelete.startsWith("/") ? oldProfileImgToDelete.substring(1) : oldProfileImgToDelete;
+                S3Utils.deleteFile(oldS3Key, amazonS3);
+            } catch (Exception ex) {
+                log.warn("Failed to delete old profile image from S3: {}", oldProfileImgToDelete, ex);
+            }
+        }
 
         // 업데이트된 사용자 프로필 반환
         UserRes res = new UserRes();
@@ -263,7 +299,7 @@ public class PortalService {
         if (Boolean.TRUE.equals(includeHouseholds)) {
             for (AdminSiteRes site : list) {
                 if (site != null && site.getSiteId() != null) {
-                    List<Household> households = siteDao.selectHouseholdsBySiteId(site.getSiteId());
+                    List<HouseholdRes> households = siteDao.selectHouseholdsBySiteId(site.getSiteId());
                     site.setHouseholds(households != null ? households : new ArrayList<>());
                 }
             }
@@ -307,12 +343,21 @@ public class PortalService {
             String extension = contentType.contains("/") ? contentType.split("/")[1] : "webp";
             byte[] bytes = Base64.getDecoder().decode(base64Data);
 
+            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
             String separator = prefix.endsWith("/") ? "" : "/";
-            String fullPath = prefix + separator + fileTag + "_" + System.currentTimeMillis() + "." + extension;
+            String fullPath = prefix + separator + fileTag + "_" + timeStamp + "." + extension;
             return "/" + S3Utils.uploadFile(fullPath, bytes, contentType, amazonS3);
         } catch (Exception e) {
             log.error("Failed to upload report image to S3 (fileTag: {})", fileTag, e);
             throw new RuntimeException("Image upload failed: " + fileTag, e);
+        }
+    }
+
+    private void checkAndQueueOldPhoto(String oldUrl, String newUrl, List<String> deleteQueue) {
+        if (oldUrl != null && !oldUrl.trim().isEmpty() && !oldUrl.startsWith("data:image")) {
+            if (newUrl != null && !oldUrl.equals(newUrl)) {
+                deleteQueue.add(oldUrl);
+            }
         }
     }
 
@@ -331,6 +376,15 @@ public class PortalService {
         String householdId = req.getHouseholdId().trim();
         String reportSubDir = reportPrefix + householdId + "/";
 
+        WorkReport existing = workReportDao.selectByHouseholdId(householdId);
+
+        // 다른 작업자가 이미 작성한 보고서는 수정 불가
+        if (existing != null && existing.getUserId() != null && !existing.getUserId().trim().isEmpty()) {
+            if (!existing.getUserId().trim().equals(userId.trim())) {
+                return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "다른 작업자가 이미 제출한 세대 보고서는 수정할 수 없습니다."));
+            }
+        }
+
         // 서명 및 5종 사진 S3 업로드 (Base64 -> S3 URL 치환)
         String confirmerSignature = uploadBase64Image(req.getConfirmerSignature(), reportSubDir, "sig");
         String photoDoor = uploadBase64Image(req.getPhotoDoor(), reportSubDir, "door");
@@ -338,6 +392,17 @@ public class PortalService {
         String photoAfter1 = uploadBase64Image(req.getPhotoAfter1(), reportSubDir, "after1");
         String photoBefore2 = uploadBase64Image(req.getPhotoBefore2(), reportSubDir, "before2");
         String photoAfter2 = uploadBase64Image(req.getPhotoAfter2(), reportSubDir, "after2");
+
+        // 기존 보고서가 있을 경우, 새로 교체되어 사용되지 않게 된 이전 S3 사진들을 수집
+        List<String> oldPhotosToDelete = new ArrayList<>();
+        if (existing != null) {
+            checkAndQueueOldPhoto(existing.getConfirmerSignature(), confirmerSignature, oldPhotosToDelete);
+            checkAndQueueOldPhoto(existing.getPhotoDoor(), photoDoor, oldPhotosToDelete);
+            checkAndQueueOldPhoto(existing.getPhotoBefore1(), photoBefore1, oldPhotosToDelete);
+            checkAndQueueOldPhoto(existing.getPhotoAfter1(), photoAfter1, oldPhotosToDelete);
+            checkAndQueueOldPhoto(existing.getPhotoBefore2(), photoBefore2, oldPhotosToDelete);
+            checkAndQueueOldPhoto(existing.getPhotoAfter2(), photoAfter2, oldPhotosToDelete);
+        }
 
         Date installDate = null;
         if (req.getInstallDate() != null && !req.getInstallDate().trim().isEmpty()) {
@@ -351,7 +416,6 @@ public class PortalService {
             installDate = new Date();
         }
 
-        WorkReport existing = workReportDao.selectByHouseholdId(householdId);
         Date now = new Date();
 
         if (existing == null) {
@@ -381,7 +445,10 @@ public class PortalService {
             report.setDeleteFlg(false);
 
             workReportDao.insert(report);
-            return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, convertToRes(report));
+
+            WorkReportRes res = workReportDao.selectReportDetailById(report.getReportId());
+            enrichReportRes(res);
+            return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
         } else {
             // 기존 보고서 수정
             existing.setSiteId(req.getSiteId().trim());
@@ -404,54 +471,154 @@ public class PortalService {
             existing.setLastUpdate(now);
 
             workReportDao.updateByPrimaryKey(existing);
-            return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, convertToRes(existing));
+
+            // 수정 제출 시 재검토 대기 상태이므로 기존 승인되었던 세대 설치 상태를 UNINSTALLED로 리셋
+            Household hh = siteDao.selectHouseholdById(householdId);
+            if (hh != null && "INSTALLED".equals(hh.getInstallStatus())) {
+                hh.setInstallStatus("UNINSTALLED");
+                siteDao.updateHousehold(hh);
+            }
+
+            // DB 업데이트 완료 후 교체된 이전 S3 사진 파일들 안전하게 삭제
+            for (String oldPhotoPath : oldPhotosToDelete) {
+                try {
+                    String oldS3Key = oldPhotoPath.startsWith("/") ? oldPhotoPath.substring(1) : oldPhotoPath;
+                    S3Utils.deleteFile(oldS3Key, amazonS3);
+                } catch (Exception ex) {
+                    log.warn("Failed to delete replaced report image from S3: {}", oldPhotoPath, ex);
+                }
+            }
+
+            WorkReportRes res = workReportDao.selectReportDetailById(existing.getReportId());
+            enrichReportRes(res);
+            return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
         }
     }
 
     /**
-     * 세대별 보고서 단건 조회
+     * 세대별 보고서 단건 조회 (본인 작성 보고서만 상세 조회 가능)
      */
     @Transactional(readOnly = true)
-    public BaseResponse getReportByHouseholdId(String householdId) {
+    public BaseResponse getReportByHouseholdId(String userId, String householdId) {
         if (householdId == null || householdId.trim().isEmpty()) {
             return ResponseUtils.generateDtoFailed(new Information("INVALID_PARAMETER", "HOUSEHOLD_ID_REQUIRED"));
         }
-        WorkReport report = workReportDao.selectByHouseholdId(householdId.trim());
-        if (report == null) {
+        WorkReportRes detail = workReportDao.selectReportDetailByHouseholdId(householdId.trim());
+        if (detail == null) {
             return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, null);
         }
-        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, convertToRes(report));
+        // 다른 작업자가 작성한 보고서인 경우 열람 차단
+        if (detail.getUserId() != null && !detail.getUserId().trim().isEmpty()) {
+            if (userId != null && !userId.trim().isEmpty() && !detail.getUserId().trim().equals(userId.trim())) {
+                return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "다른 작업자가 이미 완료한 보고서입니다."));
+            }
+        }
+        enrichReportRes(detail);
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, detail);
     }
 
     /**
-     * 내가 작성한 보고서 목록 조회
+     * 시공 보고서 목록 조회 (담당 지역 현장들 또는 본인 작성)
      */
     @Transactional(readOnly = true)
-    public BaseResponse getMyReports(String userId) {
-        List<WorkReport> list = workReportDao.selectByUserId(userId);
-        List<WorkReportRes> resList = new ArrayList<>();
-        if (list != null) {
-            for (WorkReport r : list) {
-                resList.add(convertToRes(r));
+    public BaseResponse getReports(String userId, AdminReportSearchReq req) {
+        if (req == null) {
+            req = new AdminReportSearchReq();
+        }
+
+        List<WorkReportRes> list;
+
+        // 1. 특정 현장 ID가 지정된 경우
+        if (req.getSiteId() != null && !req.getSiteId().trim().isEmpty()) {
+            list = workReportDao.selectReportList(req);
+        }
+        // 2. 특정 시도/시군구가 지정된 경우
+        else if ((req.getSido() != null && !req.getSido().trim().isEmpty())
+                || (req.getSigungu() != null && !req.getSigungu().trim().isEmpty())) {
+            list = workReportDao.selectReportList(req);
+        }
+        // 3. 조건 없이 호출된 경우: 작업자 본인 작성 보고서 100% 보장 및 배정 관할 지역 현장 보고서 수집
+        else {
+            Map<String, WorkReportRes> reportMap = new HashMap<>();
+
+            // A. 작업자 본인이 작성한 보고서는 무조건 최우선 포함
+            AdminReportSearchReq myReq = new AdminReportSearchReq();
+            myReq.setUserId(userId);
+            List<WorkReportRes> myList = workReportDao.selectReportList(myReq);
+            if (myList != null) {
+                for (WorkReportRes r : myList) {
+                    reportMap.put(r.getReportId(), r);
+                }
+            }
+
+            // B. 배정된 관할 지역(region_id)에 해당하는 현장들의 보고서 수집
+            List<UserAssignedRegionDetailRes> assigned = siteDao.selectAssignedRegionsByUserId(userId);
+            if (assigned != null && !assigned.isEmpty()) {
+                Set<String> assignedRegionIds = assigned.stream()
+                        .map(UserAssignedRegionDetailRes::getRegionId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+
+                List<AdminSiteRes> sites = siteDao.selectSiteList(null, null, null, null);
+                if (sites != null) {
+                    for (AdminSiteRes site : sites) {
+                        if (site.getRegionId() != null && assignedRegionIds.contains(site.getRegionId()) && site.getSiteId() != null) {
+                            AdminReportSearchReq siteReq = new AdminReportSearchReq();
+                            siteReq.setSiteId(site.getSiteId());
+                            List<WorkReportRes> siteReports = workReportDao.selectReportList(siteReq);
+                            if (siteReports != null) {
+                                for (WorkReportRes r : siteReports) {
+                                    reportMap.put(r.getReportId(), r);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            list = new ArrayList<>(reportMap.values());
+        }
+
+        if (list == null) {
+            list = new ArrayList<>();
+        } else {
+            for (WorkReportRes res : list) {
+                enrichReportRes(res);
             }
         }
-        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(resList));
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(list));
     }
 
-    private WorkReportRes convertToRes(WorkReport report) {
-        if (report == null) return null;
-        WorkReportRes res = new WorkReportRes();
-        BeanUtils.copyProperties(report, res);
-
+    private void enrichReportRes(WorkReportRes res) {
+        if (res == null) return;
         SimpleDateFormat dateFmt = new SimpleDateFormat("yyyy-MM-dd");
+        SimpleDateFormat koreanDateFmt = new SimpleDateFormat("yyyy년 M월 D일");
         SimpleDateFormat timeFmt = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 
-        if (report.getInstallDate() != null) {
-            res.setInstallDate(dateFmt.format(report.getInstallDate()));
+        if (res.getInstallDate() != null && !res.getInstallDate().trim().isEmpty() && res.getInstallDateFormatted() == null) {
+            try {
+                Date d = dateFmt.parse(res.getInstallDate().trim());
+                res.setInstallDateFormatted(koreanDateFmt.format(d));
+            } catch (Exception ignored) {}
         }
-        if (report.getReportTime() != null) {
-            res.setReportTime(timeFmt.format(report.getReportTime()));
+        if (res.getSubmittedAt() == null && res.getReportTime() != null) {
+            res.setSubmittedAt(res.getReportTime());
         }
-        return res;
+    }
+
+    // ── [4. 문의 내역 관리 (본인 전용)] ────────────────────────────
+
+    /**
+     * 본인의 문의 및 답변 내역 목록 조회
+     */
+    @Transactional(readOnly = true)
+    public BaseResponse getMyInquiries(String userId) {
+        if (StringUtils.isBlank(userId)) {
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_USER", "LOGIN_REQUIRED"));
+        }
+        List<Inquiry> list = inquiryDao.selectByUserId(userId);
+        return ResponseUtils.generateDtoSuccess(
+                new Information(MessageIdConst.I_GETTING_SUCCESS,
+                        messageSource.getMessage(MessageIdConst.I_GETTING_SUCCESS, new String[] { "Inquiry" }, LocaleAspect.LOCALE)),
+                new ListRes<>(list != null ? list : new ArrayList<>()));
     }
 }

@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import com.gneworks.dto.req.AdminReportSearchReq;
 import com.gneworks.dto.req.WorkReportReq;
 import java.util.Map;
 
@@ -118,15 +119,26 @@ public class PortalController extends BaseController {
      */
     @GetMapping("/report/{householdId}")
     public BaseResponse getReportByHouseholdId(@PathVariable("householdId") String householdId) {
-        return portalService.getReportByHouseholdId(householdId);
+        return portalService.getReportByHouseholdId(getCurrentUserId(), householdId);
     }
 
     /**
-     * 본인 작성 시공 보고서 목록 조회
+     * 시공 보고서 목록 조회 (담당 현장 또는 본인 작성)
      * GET /portal/reports
      */
     @GetMapping("/reports")
-    public BaseResponse getMyReports() {
-        return portalService.getMyReports(getCurrentUserId());
+    public BaseResponse getReports(AdminReportSearchReq req) {
+        return portalService.getReports(getCurrentUserId(), req);
+    }
+
+    // ── [4. 문의 내역 관리 (본인 전용)] ────────────────────────────
+
+    /**
+     * 본인의 문의 및 답변 내역 목록 조회
+     * GET /portal/inquiries
+     */
+    @GetMapping("/inquiries")
+    public BaseResponse getMyInquiries() {
+        return portalService.getMyInquiries(getCurrentUserId());
     }
 }

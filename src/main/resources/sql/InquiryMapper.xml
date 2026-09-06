@@ -108,4 +108,12 @@
     order by create_time desc
     limit 1
   </select>
+  <select id="selectByUserId" parameterType="java.lang.String" resultMap="BaseResultMap">
+    select inquiry_id, user_id, inquiry_type, phone_num, user_name, answer_user_name, 
+    create_time, answer_time, processed_flg, delete_flg, inquiry_contents, answer_contents
+    from inquiry
+    where user_id = #{userId,jdbcType=CHAR}
+      and coalesce(delete_flg, 0) = 0
+    order by create_time desc
+  </select>
 </mapper>

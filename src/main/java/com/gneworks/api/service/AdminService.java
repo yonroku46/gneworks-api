@@ -7,6 +7,7 @@ import com.gneworks.common.utils.ResponseUtils;
 import com.gneworks.dao.InquiryDao;
 import com.gneworks.dao.SiteDao;
 import com.gneworks.dao.UserDao;
+import com.gneworks.dao.WorkReportDao;
 import com.gneworks.dao.entity.FireRegion;
 import com.gneworks.dao.entity.Household;
 import com.gneworks.dao.entity.Inquiry;
@@ -15,6 +16,8 @@ import com.gneworks.dao.entity.User;
 import com.gneworks.dao.entity.UserAssignedRegion;
 import com.gneworks.dto.req.AdminHouseholdReq;
 import com.gneworks.dto.req.AdminInquiryAnswerReq;
+import com.gneworks.dto.req.AdminReportSearchReq;
+import com.gneworks.dto.req.AdminReportStatusReq;
 import com.gneworks.dto.req.AdminSiteReq;
 import com.gneworks.dto.req.AdminUserReq;
 import com.gneworks.dto.res.ActionRes;
@@ -25,6 +28,7 @@ import com.gneworks.dto.res.AdminUserRes;
 import com.gneworks.dto.res.ListRes;
 import com.gneworks.dto.res.RegionWorkerRes;
 import com.gneworks.dto.res.UserAssignedRegionDetailRes;
+import com.gneworks.dto.res.WorkReportRes;
 import com.gneworks.dto.res.core.BaseResponse;
 import com.gneworks.dto.res.core.Information;
 import lombok.extern.slf4j.Slf4j;
@@ -58,7 +62,11 @@ public class AdminService {
     private InquiryDao inquiryDao;
 
     @Autowired
+    private WorkReportDao workReportDao;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
+
 
     /**
      * 관리자(ROOT, Roles.ROOT, role_id = 9) 여부 확인
@@ -531,7 +539,7 @@ public class AdminService {
         if (targetUserId == null || targetUserId.trim().isEmpty()) {
             return ResponseUtils.generateDtoFailed(new Information("INVALID_USER_ID", "INVALID_USER_ID"));
         }
-        com.gneworks.dao.entity.FireRegion fireRegion = siteDao.selectFireRegionBySidoAndName(sidoName, regionName);
+        FireRegion fireRegion = siteDao.selectFireRegionBySidoAndName(sidoName, regionName);
         // "안산시" <-> "안산" 등 시/군/구 명칭 유연 검색 지원
         if (fireRegion == null && regionName != null && regionName.length() > 1) {
             String trimmedName = regionName.replaceAll("(시|군|구)$", "");
@@ -737,5 +745,114 @@ public class AdminService {
 
         ActionRes res = new ActionRes(inquiryId);
         return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
+    }
+
+    // ── [5. 시공 보고서 관리] ──────────────────────────────────────────
+
+    /**
+     * 시공 보고서 목록 조회 (관리자용, 다중 필터 지원)
+     */
+    @Transactional(readOnly = true)
+    public BaseResponse getReportList(String operatorUserId, AdminReportSearchReq req) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
+        }
+
+        List<WorkReportRes> list = workReportDao.selectReportList(req);
+
+        if (list == null) {
+            list = new ArrayList<>();
+        } else {
+            for (WorkReportRes res : list) {
+                enrichReportRes(res);
+            }
+        }
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(list));
+    }
+
+    /**
+     * 시공 보고서 단건 상세 조회 (관리자용)
+     */
+    @Transactional(readOnly = true)
+    public BaseResponse getReportDetail(String operatorUserId, String reportId) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
+        }
+        if (reportId == null || reportId.trim().isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_PARAMETER", "REPORT_ID_REQUIRED"));
+        }
+
+        WorkReportRes detail = workReportDao.selectReportDetailById(reportId.trim());
+        if (detail == null) {
+            return ResponseUtils.generateDtoFailed(new Information("NOT_FOUND", "REPORT_NOT_FOUND"));
+        }
+        enrichReportRes(detail);
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, detail);
+    }
+
+    /**
+     * 시공 보고서 상태 변경 (승인 COMPLETED, 반려 REJECTED + fixReason, 검토대기 PENDING)
+     */
+    @Transactional
+    public BaseResponse updateReportStatus(String operatorUserId, String reportId, AdminReportStatusReq req) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
+        }
+        if (reportId == null || reportId.trim().isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_PARAMETER", "REPORT_ID_REQUIRED"));
+        }
+        if (req == null || req.getStatus() == null || req.getStatus().trim().isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_PARAMETER", "STATUS_REQUIRED"));
+        }
+
+        String newStatus = req.getStatus().trim().toUpperCase();
+        String fixReason = req.getFixReason() != null ? req.getFixReason().trim() : "";
+
+        if ("REJECTED".equals(newStatus) && fixReason.isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("FIX_REASON_REQUIRED", "FIX_REASON_REQUIRED"));
+        }
+
+        WorkReportRes existing = workReportDao.selectReportDetailById(reportId.trim());
+        if (existing == null) {
+            return ResponseUtils.generateDtoFailed(new Information("NOT_FOUND", "REPORT_NOT_FOUND"));
+        }
+
+        workReportDao.updateReportStatus(reportId.trim(), newStatus, fixReason);
+
+        // 보고서 상태 변경에 따른 해당 세대(Household)의 install_status 동기화
+        if (existing.getHouseholdId() != null && !existing.getHouseholdId().trim().isEmpty()) {
+            Household hh = siteDao.selectHouseholdById(existing.getHouseholdId().trim());
+            if (hh != null) {
+                if ("COMPLETED".equals(newStatus)) {
+                    hh.setInstallStatus("INSTALLED");
+                } else if ("REJECTED".equals(newStatus)) {
+                    hh.setInstallStatus("HOLD");
+                } else if ("PENDING".equals(newStatus)) {
+                    hh.setInstallStatus("UNINSTALLED");
+                } else {
+                    hh.setInstallStatus("UNINSTALLED");
+                }
+                siteDao.updateHousehold(hh);
+            }
+        }
+
+        ActionRes res = new ActionRes(reportId);
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
+    }
+
+    private void enrichReportRes(WorkReportRes res) {
+        if (res == null) return;
+        if (res.getInstallDate() != null && !res.getInstallDate().trim().isEmpty()) {
+            try {
+                Date d = DATE_FORMAT.parse(res.getInstallDate().trim());
+                SimpleDateFormat koreanDateFmt = new SimpleDateFormat("yyyy년 M월 D일");
+                res.setInstallDateFormatted(koreanDateFmt.format(d));
+            } catch (Exception ignored) {}
+        }
+        if (res.getSubmittedAt() == null && res.getReportTime() != null) {
+            res.setSubmittedAt(res.getReportTime());
+        }
     }
 }

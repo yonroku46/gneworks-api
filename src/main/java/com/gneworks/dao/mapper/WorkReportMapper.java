@@ -1,6 +1,8 @@
 package com.gneworks.dao.mapper;
 
 import com.gneworks.dao.entity.WorkReport;
+import com.gneworks.dto.req.AdminReportSearchReq;
+import com.gneworks.dto.res.WorkReportRes;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -39,4 +41,15 @@ public interface WorkReportMapper {
 
     int updateByHouseholdId(WorkReport row);
 
+    List<WorkReportRes> selectReportList(AdminReportSearchReq req);
+
+    WorkReportRes selectReportDetailById(@Param("reportId") String reportId);
+
+    WorkReportRes selectReportDetailByHouseholdId(@Param("householdId") String householdId);
+
+    int updateReportStatus(
+            @Param("reportId") String reportId,
+            @Param("status") String status,
+            @Param("fixReason") String fixReason
+    );
 }

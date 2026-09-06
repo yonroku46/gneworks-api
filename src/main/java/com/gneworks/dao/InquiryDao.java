@@ -116,4 +116,18 @@ public class InquiryDao {
             throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
         }
     }
+
+    public List<Inquiry> selectByUserId(String userId) {
+        try {
+            return inquiryMapper.selectByUserId(userId);
+        } catch (Exception exception) {
+            final String methodName = "InquiryMapper#selectByUserId";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("userId", userId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
 }

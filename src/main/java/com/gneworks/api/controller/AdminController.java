@@ -5,6 +5,8 @@ import com.gneworks.api.service.AdminService;
 import com.gneworks.aspect.attribute.CheckToken;
 import com.gneworks.dto.req.AdminHouseholdReq;
 import com.gneworks.dto.req.AdminInquiryAnswerReq;
+import com.gneworks.dto.req.AdminReportSearchReq;
+import com.gneworks.dto.req.AdminReportStatusReq;
 import com.gneworks.dto.req.AdminSiteReq;
 import com.gneworks.dto.req.AdminUserReq;
 import com.gneworks.dto.res.core.BaseResponse;
@@ -237,5 +239,34 @@ public class AdminController extends BaseController {
     @DeleteMapping("/inquiry/{inquiryId}")
     public BaseResponse deleteInquiry(@PathVariable("inquiryId") String inquiryId) {
         return adminService.deleteInquiry(getCurrentUserId(), inquiryId);
+    }
+
+    // ── [5. 시공 보고서 관리] ──────────────────────────────────────────
+
+    /**
+     * 시공 보고서 목록 조회
+     * GET /admin/report/list
+     */
+    @GetMapping("/report/list")
+    public BaseResponse getReportList(AdminReportSearchReq req) {
+        return adminService.getReportList(getCurrentUserId(), req);
+    }
+
+    /**
+     * 시공 보고서 단건 상세 조회
+     * GET /admin/report/{reportId}
+     */
+    @GetMapping("/report/{reportId}")
+    public BaseResponse getReportDetail(@PathVariable("reportId") String reportId) {
+        return adminService.getReportDetail(getCurrentUserId(), reportId);
+    }
+
+    /**
+     * 시공 보고서 상태 변경 (승인 / 반려 / 대기)
+     * PUT /admin/report/{reportId}/status
+     */
+    @PutMapping("/report/{reportId}/status")
+    public BaseResponse updateReportStatus(@PathVariable("reportId") String reportId, @RequestBody AdminReportStatusReq req) {
+        return adminService.updateReportStatus(getCurrentUserId(), reportId, req);
     }
 }

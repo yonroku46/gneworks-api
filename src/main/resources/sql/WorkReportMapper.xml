@@ -27,6 +27,37 @@
     <result column="delete_flg" jdbcType="BIT" property="deleteFlg" />
     <result column="fix_reason" jdbcType="LONGVARCHAR" property="fixReason" />
   </resultMap>
+  <resultMap id="ReportDetailResultMap" type="com.gneworks.dto.res.WorkReportRes">
+    <id column="report_id" property="reportId" />
+    <result column="household_id" property="householdId" />
+    <result column="site_id" property="siteId" />
+    <result column="site_name" property="siteName" />
+    <result column="sido" property="sido" />
+    <result column="sigungu" property="sigungu" />
+    <result column="eupmyeondong" property="eupmyeondong" />
+    <result column="address" property="address" />
+    <result column="user_id" property="userId" />
+    <result column="user_id" property="installerId" />
+    <result column="dong" property="dong" />
+    <result column="ho" property="ho" />
+    <result column="head_name" property="headName" />
+    <result column="install_date" property="installDate" />
+    <result column="report_time" property="reportTime" />
+    <result column="report_time" property="submittedAt" />
+    <result column="reporter_name" property="reporterName" />
+    <result column="confirmer_name" property="confirmerName" />
+    <result column="confirmer_signature" property="confirmerSignature" />
+    <result column="photo_door" property="photoDoor" />
+    <result column="photo_before1" property="photoBefore1" />
+    <result column="photo_after1" property="photoAfter1" />
+    <result column="photo_before2" property="photoBefore2" />
+    <result column="photo_after2" property="photoAfter2" />
+    <result column="status" property="status" />
+    <result column="remarks" property="remarks" />
+    <result column="fix_reason" property="fixReason" />
+    <result column="create_time" property="createTime" />
+    <result column="last_update" property="lastUpdate" />
+  </resultMap>
   <sql id="Base_Column_List">
     report_id, household_id, site_id, user_id, dong, ho, head_name, install_date,
     report_time, reporter_name, confirmer_name, confirmer_signature, photo_door, photo_before1,
@@ -146,4 +177,98 @@
       and delete_flg = 0
     order by create_time desc
   </select>
+  <select id="selectReportList" parameterType="com.gneworks.dto.req.AdminReportSearchReq" resultMap="ReportDetailResultMap">
+    select 
+      wr.report_id, wr.household_id, wr.site_id, wr.user_id, wr.dong, wr.ho, wr.head_name,
+      date_format(wr.install_date, '%Y-%m-%d') as install_date,
+      date_format(wr.report_time, '%Y-%m-%d %H:%i') as report_time,
+      wr.reporter_name, wr.confirmer_name, wr.confirmer_signature,
+      wr.photo_door, wr.photo_before1, wr.photo_after1, wr.photo_before2, wr.photo_after2,
+      wr.`status`, wr.remarks, wr.fix_reason, wr.create_time, wr.last_update,
+      s.name as site_name, s.sido, s.sigungu, s.eupmyeondong, s.address
+    from work_report wr
+    left join site s on wr.site_id = s.site_id
+    where wr.delete_flg = 0
+    <if test="sido != null and sido != '' and sido != 'ALL'">
+      and s.sido = #{sido}
+    </if>
+    <if test="sigungu != null and sigungu != '' and sigungu != 'ALL'">
+      and (
+        s.sigungu = #{sigungu}
+        or s.sigungu like concat(#{sigungu}, '%')
+        or #{sigungu} like concat(s.sigungu, '%')
+      )
+    </if>
+    <if test="eupmyeondong != null and eupmyeondong != '' and eupmyeondong != 'ALL'">
+      and s.eupmyeondong like concat('%', #{eupmyeondong}, '%')
+    </if>
+    <if test="status != null and status != '' and status != 'ALL'">
+      and wr.status = #{status}
+    </if>
+    <if test="installStartDate != null and installStartDate != ''">
+      and wr.install_date &gt;= #{installStartDate}
+    </if>
+    <if test="installEndDate != null and installEndDate != ''">
+      and wr.install_date &lt;= #{installEndDate}
+    </if>
+    <if test="reportStartDate != null and reportStartDate != ''">
+      and wr.report_time &gt;= concat(#{reportStartDate}, ' 00:00:00')
+    </if>
+    <if test="reportEndDate != null and reportEndDate != ''">
+      and wr.report_time &lt;= concat(#{reportEndDate}, ' 23:59:59')
+    </if>
+    <if test="query != null and query != ''">
+      and (
+        s.name like concat('%', #{query}, '%')
+        or wr.dong like concat('%', #{query}, '%')
+        or concat(wr.dong, '동') like concat('%', #{query}, '%')
+        or wr.ho like concat('%', #{query}, '%')
+        or concat(wr.ho, '호') like concat('%', #{query}, '%')
+        or wr.reporter_name like concat('%', #{query}, '%')
+        or wr.head_name like concat('%', #{query}, '%')
+      )
+    </if>
+    <if test="userId != null and userId != ''">
+      and wr.user_id = #{userId}
+    </if>
+    <if test="siteId != null and siteId != ''">
+      and wr.site_id = #{siteId}
+    </if>
+    order by wr.report_time desc, wr.create_time desc
+  </select>
+  <select id="selectReportDetailById" parameterType="java.lang.String" resultMap="ReportDetailResultMap">
+    select 
+      wr.report_id, wr.household_id, wr.site_id, wr.user_id, wr.dong, wr.ho, wr.head_name,
+      date_format(wr.install_date, '%Y-%m-%d') as install_date,
+      date_format(wr.report_time, '%Y-%m-%d %H:%i') as report_time,
+      wr.reporter_name, wr.confirmer_name, wr.confirmer_signature,
+      wr.photo_door, wr.photo_before1, wr.photo_after1, wr.photo_before2, wr.photo_after2,
+      wr.`status`, wr.remarks, wr.fix_reason, wr.create_time, wr.last_update,
+      s.name as site_name, s.sido, s.sigungu, s.eupmyeondong, s.address
+    from work_report wr
+    left join site s on wr.site_id = s.site_id
+    where wr.report_id = #{reportId} and wr.delete_flg = 0
+    limit 1
+  </select>
+  <select id="selectReportDetailByHouseholdId" parameterType="java.lang.String" resultMap="ReportDetailResultMap">
+    select 
+      wr.report_id, wr.household_id, wr.site_id, wr.user_id, wr.dong, wr.ho, wr.head_name,
+      date_format(wr.install_date, '%Y-%m-%d') as install_date,
+      date_format(wr.report_time, '%Y-%m-%d %H:%i') as report_time,
+      wr.reporter_name, wr.confirmer_name, wr.confirmer_signature,
+      wr.photo_door, wr.photo_before1, wr.photo_after1, wr.photo_before2, wr.photo_after2,
+      wr.`status`, wr.remarks, wr.fix_reason, wr.create_time, wr.last_update,
+      s.name as site_name, s.sido, s.sigungu, s.eupmyeondong, s.address
+    from work_report wr
+    left join site s on wr.site_id = s.site_id
+    where wr.household_id = #{householdId} and wr.delete_flg = 0
+    limit 1
+  </select>
+  <update id="updateReportStatus">
+    update work_report
+    set `status` = #{status},
+        fix_reason = #{fixReason},
+        last_update = now()
+    where report_id = #{reportId} and delete_flg = 0
+  </update>
 </mapper>

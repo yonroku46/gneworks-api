@@ -5,6 +5,8 @@ import com.gneworks.common.constants.MessageIdConst;
 import com.gneworks.common.utils.StringUtils;
 import com.gneworks.dao.entity.WorkReport;
 import com.gneworks.dao.mapper.WorkReportMapper;
+import com.gneworks.dto.req.AdminReportSearchReq;
+import com.gneworks.dto.res.WorkReportRes;
 import com.gneworks.exception.SystemException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -88,6 +90,63 @@ public class WorkReportDao {
             final String methodName = "WorkReportMapper#selectByUserId";
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("userId", userId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public List<WorkReportRes> selectReportList(AdminReportSearchReq req) {
+        try {
+            return workReportMapper.selectReportList(req);
+        } catch (Exception exception) {
+            final String methodName = "WorkReportMapper#selectReportList";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("req", req);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public WorkReportRes selectReportDetailById(String reportId) {
+        try {
+            return workReportMapper.selectReportDetailById(reportId);
+        } catch (Exception exception) {
+            final String methodName = "WorkReportMapper#selectReportDetailById";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("reportId", reportId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public WorkReportRes selectReportDetailByHouseholdId(String householdId) {
+        try {
+            return workReportMapper.selectReportDetailByHouseholdId(householdId);
+        } catch (Exception exception) {
+            final String methodName = "WorkReportMapper#selectReportDetailByHouseholdId";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("householdId", householdId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public int updateReportStatus(String reportId, String status, String fixReason) {
+        try {
+            return workReportMapper.updateReportStatus(reportId, status, fixReason);
+        } catch (Exception exception) {
+            final String methodName = "WorkReportMapper#updateReportStatus";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("reportId", reportId);
+            paramMap.put("status", status);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
             log.error(overview + detail);

@@ -46,7 +46,7 @@
     <result column="total_households" property="totalHouseholds" />
     <result column="dong_count" property="dongCount" />
     <result column="completed_households" property="completedHouseholds" />
-    <collection property="households" ofType="com.gneworks.dao.entity.Household" notNullColumn="hh_id">
+    <collection property="households" ofType="com.gneworks.dto.res.HouseholdRes" notNullColumn="hh_id">
       <id column="hh_id" property="householdId" />
       <result column="hh_site_id" property="siteId" />
       <result column="hh_dong" property="dong" />
@@ -56,6 +56,11 @@
       <result column="hh_install_status" property="installStatus" />
       <result column="hh_remarks" property="remarks" />
       <result column="hh_create_time" property="createTime" />
+      <result column="hh_report_id" property="reportId" />
+      <result column="hh_report_status" property="reportStatus" />
+      <result column="hh_report_user_id" property="reportUserId" />
+      <result column="hh_reporter_name" property="reporterName" />
+      <result column="hh_report_time" property="reportTime" />
     </collection>
   </resultMap>
 
@@ -149,12 +154,18 @@
       h.install_status as hh_install_status,
       h.remarks as hh_remarks,
       h.create_time as hh_create_time,
+      wr.report_id as hh_report_id,
+      wr.status as hh_report_status,
+      wr.user_id as hh_report_user_id,
+      wr.reporter_name as hh_reporter_name,
+      date_format(wr.report_time, '%Y-%m-%d %H:%i') as hh_report_time,
       (select count(*) from household where site_id = s.site_id) as total_households,
       (select count(distinct dong) from household where site_id = s.site_id) as dong_count,
       (select count(*) from household where site_id = s.site_id and install_status = 'INSTALLED') as completed_households
     from site s
     left join household h on s.site_id = h.site_id
+    left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0
     where s.site_id = #{siteId}
-    order by h.dong asc, h.ho asc
+    order by h.dong asc, cast(h.ho as unsigned) asc, h.ho asc
   </select>
 </mapper>

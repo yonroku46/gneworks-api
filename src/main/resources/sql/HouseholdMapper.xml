@@ -12,17 +12,21 @@
     <result column="remarks" jdbcType="VARCHAR" property="remarks" />
     <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
   </resultMap>
-
+  <resultMap id="HouseholdDetailResultMap" type="com.gneworks.dto.res.HouseholdRes" extends="BaseResultMap">
+    <result column="report_id" property="reportId" />
+    <result column="report_status" property="reportStatus" />
+    <result column="report_user_id" property="reportUserId" />
+    <result column="reporter_name" property="reporterName" />
+    <result column="report_time" property="reportTime" />
+  </resultMap>
   <delete id="deleteByPrimaryKey" parameterType="java.lang.String">
     delete from household
     where household_id = #{householdId,jdbcType=CHAR}
   </delete>
-
   <delete id="deleteBySiteId" parameterType="java.lang.String">
     delete from household
     where site_id = #{siteId,jdbcType=CHAR}
   </delete>
-
   <insert id="insert" parameterType="com.gneworks.dao.entity.Household">
     insert into household (household_id, site_id, dong, 
       ho, head_name, target_type, 
@@ -31,7 +35,6 @@
       #{ho,jdbcType=VARCHAR}, #{headName,jdbcType=VARCHAR}, #{targetType,jdbcType=VARCHAR}, 
       #{installStatus,jdbcType=VARCHAR}, #{remarks,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP})
   </insert>
-
   <update id="updateByPrimaryKey" parameterType="com.gneworks.dao.entity.Household">
     update household
     set site_id = #{siteId,jdbcType=CHAR},
@@ -44,25 +47,29 @@
       create_time = #{createTime,jdbcType=TIMESTAMP}
     where household_id = #{householdId,jdbcType=CHAR}
   </update>
-
   <select id="selectByPrimaryKey" parameterType="java.lang.String" resultMap="BaseResultMap">
     select household_id, site_id, dong, ho, head_name, target_type, install_status, remarks, 
     create_time
     from household
     where household_id = #{householdId,jdbcType=CHAR}
   </select>
-
   <select id="selectAll" resultMap="BaseResultMap">
     select household_id, site_id, dong, ho, head_name, target_type, install_status, remarks, 
     create_time
     from household
   </select>
-
-  <select id="selectBySiteId" parameterType="java.lang.String" resultMap="BaseResultMap">
-    select household_id, site_id, dong, ho, head_name, target_type, install_status, remarks, 
-    create_time
-    from household
-    where site_id = #{siteId,jdbcType=CHAR}
-    order by dong asc, ho asc
+  <select id="selectBySiteId" parameterType="java.lang.String" resultMap="HouseholdDetailResultMap">
+    select 
+      h.household_id, h.site_id, h.dong, h.ho, h.head_name, h.target_type, h.install_status, h.remarks, 
+      h.create_time,
+      wr.report_id,
+      wr.status as report_status,
+      wr.user_id as report_user_id,
+      wr.reporter_name,
+      date_format(wr.report_time, '%Y-%m-%d %H:%i') as report_time
+    from household h
+    left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0
+    where h.site_id = #{siteId,jdbcType=CHAR}
+    order by h.dong asc, cast(h.ho as unsigned) asc, h.ho asc
   </select>
 </mapper>

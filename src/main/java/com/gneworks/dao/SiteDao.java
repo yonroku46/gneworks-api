@@ -12,6 +12,7 @@ import com.gneworks.dao.mapper.HouseholdMapper;
 import com.gneworks.dao.mapper.SiteMapper;
 import com.gneworks.dao.mapper.UserAssignedRegionMapper;
 import com.gneworks.dto.res.AdminSiteRes;
+import com.gneworks.dto.res.HouseholdRes;
 import com.gneworks.dto.res.RegionWorkerRes;
 import com.gneworks.dto.res.UserAssignedRegionDetailRes;
 import com.gneworks.exception.SystemException;
@@ -176,13 +177,41 @@ public class SiteDao {
         }
     }
 
-    public List<Household> selectHouseholdsBySiteId(String siteId) {
+    public List<HouseholdRes> selectHouseholdsBySiteId(String siteId) {
         try {
             return householdMapper.selectBySiteId(siteId);
         } catch (Exception exception) {
             final String methodName = "HouseholdMapper#selectBySiteId";
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("siteId", siteId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public Household selectHouseholdById(String householdId) {
+        try {
+            return householdMapper.selectByPrimaryKey(householdId);
+        } catch (Exception exception) {
+            final String methodName = "HouseholdMapper#selectByPrimaryKey";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("householdId", householdId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public int updateHousehold(Household household) {
+        try {
+            return householdMapper.updateByPrimaryKey(household);
+        } catch (Exception exception) {
+            final String methodName = "HouseholdMapper#updateByPrimaryKey";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("household", household);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
             log.error(overview + detail);
