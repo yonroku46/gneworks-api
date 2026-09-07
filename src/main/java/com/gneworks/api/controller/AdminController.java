@@ -5,14 +5,18 @@ import com.gneworks.api.service.AdminService;
 import com.gneworks.aspect.attribute.CheckToken;
 import com.gneworks.dto.req.AdminHouseholdReq;
 import com.gneworks.dto.req.AdminInquiryAnswerReq;
+import com.gneworks.dto.req.AdminInquirySearchReq;
 import com.gneworks.dto.req.AdminReportSearchReq;
 import com.gneworks.dto.req.AdminReportStatusReq;
 import com.gneworks.dto.req.AdminSiteReq;
 import com.gneworks.dto.req.AdminUserReq;
+import com.gneworks.dto.req.AdminUserSearchReq;
 import com.gneworks.dto.res.core.BaseResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
 import java.util.Map;
 
@@ -34,6 +38,24 @@ public class AdminController extends BaseController {
     @GetMapping("/user/list")
     public BaseResponse getUserList() {
         return adminService.getUserList(getCurrentUserId());
+    }
+
+    /**
+     * 작업자 계정 목록 페이징 조회
+     * GET /admin/user/paged
+     */
+    @GetMapping("/user/paged")
+    public BaseResponse getUserListPaged(AdminUserSearchReq req) {
+        return adminService.getUserListPaged(getCurrentUserId(), req);
+    }
+
+    /**
+     * 작업자 계정 목록 대용량 엑셀 다운로드
+     * GET /admin/user/export/excel
+     */
+    @GetMapping("/user/export/excel")
+    public void exportUsersExcel(AdminUserSearchReq req, HttpServletResponse response) throws IOException {
+        adminService.exportUsersExcel(getCurrentUserId(), req, response);
     }
 
     /**
@@ -75,17 +97,43 @@ public class AdminController extends BaseController {
 
     // ── [2. 현장 / 세대 관리] ────────────────────────────────────
 
+
     /**
-     * 현장 목록 조회 (필터: sido, sigungu, eupmyeondong, query)
+     * 현장 목록 조회 (대시보드 등 연동용: limit, orderBy 지원)
      * GET /admin/site/list
      */
     @GetMapping("/site/list")
     public BaseResponse getSiteList(
-            @RequestParam(value = "sido", required = false) String sido,
-            @RequestParam(value = "sigungu", required = false) String sigungu,
-            @RequestParam(value = "eupmyeondong", required = false) String eupmyeondong,
-            @RequestParam(value = "query", required = false) String query) {
-        return adminService.getSiteList(getCurrentUserId(), sido, sigungu, eupmyeondong, query);
+            @RequestParam(value = "regionId", required = false) String regionId,
+            @RequestParam(value = "query", required = false) String query,
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestParam(value = "orderBy", required = false) String orderBy) {
+        return adminService.getSiteList(getCurrentUserId(), regionId, query, limit, orderBy);
+    }
+
+    /**
+     * 현장 목록 페이징 조회 (대용량 데이터 대응)
+     * GET /admin/site/paged
+     */
+    @GetMapping("/site/paged")
+    public BaseResponse getSiteListPaged(
+            @RequestParam(value = "regionId", required = false) String regionId,
+            @RequestParam(value = "query", required = false) String query,
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "size", defaultValue = "30") int size) {
+        return adminService.getSiteListPaged(getCurrentUserId(), regionId, query, page, size);
+    }
+
+    /**
+     * 현장 목록 대용량 엑셀 스트리밍 다운로드
+     * GET /admin/site/export/excel
+     */
+    @GetMapping("/site/export/excel")
+    public void exportSitesExcel(
+            @RequestParam(value = "regionId", required = false) String regionId,
+            @RequestParam(value = "query", required = false) String query,
+            HttpServletResponse response) throws IOException {
+        adminService.exportSitesExcel(getCurrentUserId(), regionId, query, response);
     }
 
     /**
@@ -159,10 +207,8 @@ public class AdminController extends BaseController {
      */
     @GetMapping("/region/workers")
     public BaseResponse getRegionWorkers(
-            @RequestParam(value = "sido", required = false) String sido,
-            @RequestParam(value = "sigungu", required = false) String sigungu,
             @RequestParam(value = "regionId", required = false) String regionId) {
-        return adminService.getRegionWorkers(getCurrentUserId(), sido, sigungu, regionId);
+        return adminService.getRegionWorkers(getCurrentUserId(), regionId);
     }
 
     /**
@@ -180,9 +226,10 @@ public class AdminController extends BaseController {
      */
     @PostMapping("/user/{userId}/regions")
     public BaseResponse assignRegion(@PathVariable("userId") String targetUserId, @RequestBody Map<String, String> body) {
+        String regionId = body.get("regionId");
         String sidoName = body.get("sidoName");
         String regionName = body.get("regionName");
-        return adminService.assignRegion(getCurrentUserId(), targetUserId, sidoName, regionName);
+        return adminService.assignRegion(getCurrentUserId(), targetUserId, regionId, sidoName, regionName);
     }
 
     /**
@@ -203,6 +250,24 @@ public class AdminController extends BaseController {
     @GetMapping("/inquiry/list")
     public BaseResponse getInquiryList() {
         return adminService.getInquiryList(getCurrentUserId());
+    }
+
+    /**
+     * 문의 목록 페이징 조회
+     * GET /admin/inquiry/paged
+     */
+    @GetMapping("/inquiry/paged")
+    public BaseResponse getInquiryListPaged(AdminInquirySearchReq req) {
+        return adminService.getInquiryListPaged(getCurrentUserId(), req);
+    }
+
+    /**
+     * 문의 목록 대용량 엑셀 다운로드
+     * GET /admin/inquiry/export/excel
+     */
+    @GetMapping("/inquiry/export/excel")
+    public void exportInquiriesExcel(AdminInquirySearchReq req, HttpServletResponse response) throws IOException {
+        adminService.exportInquiriesExcel(getCurrentUserId(), req, response);
     }
 
     /**
@@ -253,6 +318,24 @@ public class AdminController extends BaseController {
     }
 
     /**
+     * 시공 보고서 목록 페이징 조회
+     * GET /admin/report/paged
+     */
+    @GetMapping("/report/paged")
+    public BaseResponse getReportListPaged(AdminReportSearchReq req) {
+        return adminService.getReportListPaged(getCurrentUserId(), req);
+    }
+
+    /**
+     * 시공 보고서 목록 대용량 엑셀 다운로드
+     * GET /admin/report/export/excel
+     */
+    @GetMapping("/report/export/excel")
+    public void exportReportsExcel(AdminReportSearchReq req, HttpServletResponse response) throws IOException {
+        adminService.exportReportsExcel(getCurrentUserId(), req, response);
+    }
+
+    /**
      * 시공 보고서 단건 상세 조회
      * GET /admin/report/{reportId}
      */
@@ -268,5 +351,28 @@ public class AdminController extends BaseController {
     @PutMapping("/report/{reportId}/status")
     public BaseResponse updateReportStatus(@PathVariable("reportId") String reportId, @RequestBody AdminReportStatusReq req) {
         return adminService.updateReportStatus(getCurrentUserId(), reportId, req);
+    }
+
+    // ── [6. 대시보드 전용 최적화 API] ──────────────────────────────────────────
+
+    /**
+     * 작업자 실적 랭킹 목록 조회 (대시보드 전용: limit 최대 10곳 등 지원)
+     * GET /admin/worker/ranking
+     */
+    @GetMapping("/worker/ranking")
+    public BaseResponse getWorkerRanking(
+            @RequestParam(value = "regionId", required = false) String regionId,
+            @RequestParam(value = "limit", defaultValue = "10") Integer limit) {
+        return adminService.getWorkerRanking(getCurrentUserId(), regionId, limit);
+    }
+
+    /**
+     * 대시보드 권역 종합 메트릭 집계 (세대수, 진행률, 보고서 통계 단일 집계)
+     * GET /admin/dashboard/summary
+     */
+    @GetMapping("/dashboard/summary")
+    public BaseResponse getDashboardSummary(
+            @RequestParam(value = "regionId", required = false) String regionId) {
+        return adminService.getDashboardSummary(getCurrentUserId(), regionId);
     }
 }

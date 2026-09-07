@@ -117,27 +117,66 @@
     from site s
     left join household h on s.site_id = h.site_id
     <where>
-      <if test="sido != null and sido != '' and sido != 'ALL'">
-        and s.sido = #{sido}
-      </if>
-      <if test="sigungu != null and sigungu != '' and sigungu != 'ALL'">
-        and (
-          s.sigungu = #{sigungu}
-          or s.sigungu like concat(#{sigungu}, '%')
-          or #{sigungu} like concat(s.sigungu, '%')
-          or s.region = #{sigungu}
-          or s.region like concat(#{sigungu}, '%')
-        )
-      </if>
-      <if test="eupmyeondong != null and eupmyeondong != '' and eupmyeondong != 'ALL'">
-        and s.eupmyeondong like concat('%', #{eupmyeondong}, '%')
+      <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+        and s.region_id = #{regionId}
       </if>
       <if test="query != null and query != ''">
         and (s.name like concat('%', #{query}, '%') or s.address like concat('%', #{query}, '%'))
       </if>
     </where>
     group by s.site_id
+    <choose>
+      <when test="orderBy == 'RATE_DESC'">
+        order by (case when count(h.household_id) > 0 then count(case when h.install_status = 'INSTALLED' then 1 end) * 1.0 / count(h.household_id) else 0 end) desc, s.create_time desc
+      </when>
+      <otherwise>
+        order by s.create_time desc
+      </otherwise>
+    </choose>
+    <if test="limit != null and limit > 0">
+      limit #{limit}
+    </if>
+  </select>
+
+  <!-- 현장 목록 페이징 조회 (대용량 데이터 대응: 서브쿼리로 LIMIT 후 조인) -->
+  <select id="selectSiteListPaged" resultMap="SiteListResultMap">
+    select 
+      s.site_id, s.region_id, s.name, s.region, s.address, s.sido, s.sigungu, s.eupmyeondong,
+      s.contact_phone, s.create_time,
+      count(h.household_id) as total_households,
+      count(distinct h.dong) as dong_count,
+      count(case when h.install_status = 'INSTALLED' then 1 end) as completed_households
+    from (
+      select site_id, region_id, name, region, address, sido, sigungu, eupmyeondong, contact_phone, create_time
+      from site
+      <where>
+        <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+          and region_id = #{regionId}
+        </if>
+        <if test="query != null and query != ''">
+          and (name like concat('%', #{query}, '%') or address like concat('%', #{query}, '%'))
+        </if>
+      </where>
+      order by create_time desc
+      limit #{size} offset #{offset}
+    ) s
+    left join household h on s.site_id = h.site_id
+    group by s.site_id
     order by s.create_time desc
+  </select>
+
+  <!-- 현장 목록 전체 건수 조회 -->
+  <select id="selectSiteListCount" resultType="long">
+    select count(*)
+    from site
+    <where>
+      <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+        and region_id = #{regionId}
+      </if>
+      <if test="query != null and query != ''">
+        and (name like concat('%', #{query}, '%') or address like concat('%', #{query}, '%'))
+      </if>
+    </where>
   </select>
 
   <!-- 현장 상세 조회 (세대 목록 컬렉션 포함) -->
@@ -167,5 +206,20 @@
     left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0
     where s.site_id = #{siteId}
     order by h.dong asc, cast(h.ho as unsigned) asc, h.ho asc
+  </select>
+
+  <!-- 대시보드용 권역별 세대수 및 완료 세대수 집계 -->
+  <select id="selectRegionalHouseholdSummary" resultType="map">
+    select 
+      count(distinct s.site_id) as totalSites,
+      count(h.household_id) as totalTarget,
+      count(case when h.install_status = 'INSTALLED' then 1 end) as completedTarget
+    from site s
+    left join household h on s.site_id = h.site_id
+    <where>
+      <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+        and s.region_id = #{regionId}
+      </if>
+    </where>
   </select>
 </mapper>

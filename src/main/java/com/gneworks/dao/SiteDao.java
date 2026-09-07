@@ -46,15 +46,52 @@ public class SiteDao {
 
     // ── [1. Site] ───────────────────────────────────────────
 
-    public List<AdminSiteRes> selectSiteList(String sido, String sigungu, String eupmyeondong, String query) {
+    public List<AdminSiteRes> selectSiteList(String regionId, String query) {
+        return selectSiteList(regionId, query, null, null);
+    }
+
+    public List<AdminSiteRes> selectSiteList(String regionId, String query, Integer limit, String orderBy) {
         try {
-            return siteMapper.selectSiteList(sido, sigungu, eupmyeondong, query);
+            return siteMapper.selectSiteList(regionId, query, limit, orderBy);
         } catch (Exception exception) {
             final String methodName = "SiteMapper#selectSiteList";
             Map<String, Object> paramMap = new HashMap<>();
-            paramMap.put("sido", sido);
-            paramMap.put("sigungu", sigungu);
-            paramMap.put("eupmyeondong", eupmyeondong);
+            paramMap.put("regionId", regionId);
+            paramMap.put("query", query);
+            paramMap.put("limit", limit);
+            paramMap.put("orderBy", orderBy);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public List<AdminSiteRes> selectSiteListPaged(String regionId, String query, int page, int size) {
+        try {
+            int offset = Math.max(0, (page - 1) * size);
+            return siteMapper.selectSiteListPaged(regionId, query, offset, size);
+        } catch (Exception exception) {
+            final String methodName = "SiteMapper#selectSiteListPaged";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("regionId", regionId);
+            paramMap.put("query", query);
+            paramMap.put("page", page);
+            paramMap.put("size", size);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public long selectSiteListCount(String regionId, String query) {
+        try {
+            return siteMapper.selectSiteListCount(regionId, query);
+        } catch (Exception exception) {
+            final String methodName = "SiteMapper#selectSiteListCount";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("regionId", regionId);
             paramMap.put("query", query);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
@@ -248,20 +285,28 @@ public class SiteDao {
         }
     }
 
-    // ── [4. UserAssignedRegion] ─────────────────────────────
-
-    public List<RegionWorkerRes> selectRegionWorkers(String sido, String sigungu) {
-        return selectRegionWorkers(sido, sigungu, null);
+    public FireRegion selectFireRegionById(String regionId) {
+        try {
+            return fireRegionMapper.selectByPrimaryKey(regionId);
+        } catch (Exception exception) {
+            final String methodName = "FireRegionMapper#selectByPrimaryKey";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("regionId", regionId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
     }
 
-    public List<RegionWorkerRes> selectRegionWorkers(String sido, String sigungu, String regionId) {
+    // ── [4. UserAssignedRegion] ─────────────────────────────
+
+    public List<RegionWorkerRes> selectRegionWorkers(String regionId) {
         try {
-            return userAssignedRegionMapper.selectRegionWorkers(sido, sigungu, regionId);
+            return userAssignedRegionMapper.selectRegionWorkers(regionId);
         } catch (Exception exception) {
             final String methodName = "UserAssignedRegionMapper#selectRegionWorkers";
             Map<String, Object> paramMap = new HashMap<>();
-            paramMap.put("sido", sido);
-            paramMap.put("sigungu", sigungu);
             paramMap.put("regionId", regionId);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
@@ -319,6 +364,20 @@ public class SiteDao {
             final String methodName = "UserAssignedRegionMapper#deleteByUserIdAndRegionId";
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("userId", userId);
+            paramMap.put("regionId", regionId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public Map<String, Object> selectRegionalHouseholdSummary(String regionId) {
+        try {
+            return siteMapper.selectRegionalHouseholdSummary(regionId);
+        } catch (Exception exception) {
+            final String methodName = "SiteMapper#selectRegionalHouseholdSummary";
+            Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("regionId", regionId);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);

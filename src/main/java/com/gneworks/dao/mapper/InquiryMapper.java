@@ -1,6 +1,8 @@
 package com.gneworks.dao.mapper;
 
 import com.gneworks.dao.entity.Inquiry;
+import com.gneworks.dto.req.AdminInquirySearchReq;
+import com.gneworks.dto.res.AdminInquiryRes;
 import jakarta.annotation.Generated;
 import java.util.List;
 
@@ -27,4 +29,8 @@ public interface InquiryMapper {
     Inquiry selectLatestPendingInquiry();
 
     List<Inquiry> selectByUserId(String userId);
+
+    List<AdminInquiryRes> selectInquiryListPaged(AdminInquirySearchReq req);
+
+    long selectInquiryCount(AdminInquirySearchReq req);
 }

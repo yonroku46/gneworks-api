@@ -39,6 +39,17 @@ public class PortalController extends BaseController {
         return portalService.updateProfile(getCurrentUserId(), updates);
     }
 
+    /**
+     * 본인 비밀번호 변경
+     * PUT /portal/profile/password
+     */
+    @PutMapping("/profile/password")
+    public BaseResponse changePassword(@RequestBody Map<String, String> body) {
+        String currentPassword = body != null ? body.get("currentPassword") : null;
+        String newPassword = body != null ? body.get("newPassword") : null;
+        return portalService.changePassword(getCurrentUserId(), currentPassword, newPassword);
+    }
+
     // ── [2. 담당 지역 관리 (본인 전용)] ────────────────────────────
 
     /**
@@ -56,9 +67,10 @@ public class PortalController extends BaseController {
      */
     @PostMapping("/regions")
     public BaseResponse assignRegion(@RequestBody Map<String, String> body) {
+        String regionId = body != null ? body.get("regionId") : null;
         String sidoName = body != null ? body.get("sidoName") : null;
         String regionName = body != null ? body.get("regionName") : null;
-        return portalService.assignRegion(getCurrentUserId(), sidoName, regionName);
+        return portalService.assignRegion(getCurrentUserId(), regionId, sidoName, regionName);
     }
 
     /**
@@ -85,12 +97,20 @@ public class PortalController extends BaseController {
      */
     @GetMapping("/sites")
     public BaseResponse getSites(
-            @RequestParam(value = "sido", required = false) String sido,
-            @RequestParam(value = "sigungu", required = false) String sigungu,
-            @RequestParam(value = "eupmyeondong", required = false) String eupmyeondong,
+            @RequestParam(value = "regionId", required = false) String regionId,
             @RequestParam(value = "query", required = false) String query,
+            @RequestParam(value = "limit", required = false) Integer limit,
             @RequestParam(value = "includeHouseholds", required = false, defaultValue = "true") Boolean includeHouseholds) {
-        return portalService.getSites(sido, sigungu, eupmyeondong, query, includeHouseholds);
+        return portalService.getSites(regionId, query, limit, includeHouseholds);
+    }
+
+    /**
+     * 권역별 세대수 및 현장수 요약 집계
+     * GET /portal/regions/{regionId}/summary
+     */
+    @GetMapping("/regions/{regionId}/summary")
+    public BaseResponse getRegionSummary(@PathVariable("regionId") String regionId) {
+        return portalService.getRegionSummary(regionId);
     }
 
     /**

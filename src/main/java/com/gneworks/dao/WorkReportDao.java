@@ -6,6 +6,7 @@ import com.gneworks.common.utils.StringUtils;
 import com.gneworks.dao.entity.WorkReport;
 import com.gneworks.dao.mapper.WorkReportMapper;
 import com.gneworks.dto.req.AdminReportSearchReq;
+import com.gneworks.dto.res.AdminWorkerStatRes;
 import com.gneworks.dto.res.WorkReportRes;
 import com.gneworks.exception.SystemException;
 import lombok.extern.slf4j.Slf4j;
@@ -147,6 +148,63 @@ public class WorkReportDao {
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("reportId", reportId);
             paramMap.put("status", status);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public long selectReportCount(AdminReportSearchReq req) {
+        try {
+            return workReportMapper.selectReportCount(req);
+        } catch (Exception exception) {
+            final String methodName = "WorkReportMapper#selectReportCount";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("req", req);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public List<AdminWorkerStatRes> selectWorkerRanking(String regionId, Integer limit) {
+        try {
+            return workReportMapper.selectWorkerRanking(regionId, limit);
+        } catch (Exception exception) {
+            final String methodName = "WorkReportMapper#selectWorkerRanking";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("regionId", regionId);
+            paramMap.put("limit", limit);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public long selectWorkerRankingCount(String regionId) {
+        try {
+            return workReportMapper.selectWorkerRankingCount(regionId);
+        } catch (Exception exception) {
+            final String methodName = "WorkReportMapper#selectWorkerRankingCount";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("regionId", regionId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public Map<String, Object> selectReportSummary(String regionId) {
+        try {
+            return workReportMapper.selectReportSummary(regionId);
+        } catch (Exception exception) {
+            final String methodName = "WorkReportMapper#selectReportSummary";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("regionId", regionId);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
             log.error(overview + detail);

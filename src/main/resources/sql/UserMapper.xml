@@ -121,4 +121,62 @@
     set last_update = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 9 HOUR)
     where user_id = #{userId,jdbcType=CHAR}
   </update>
+
+  <!-- 계정 목록 검색 및 페이징/전체 조회 (담당 지역 수, 실적 건수 포함) -->
+  <select id="selectUserListPaged" parameterType="com.gneworks.dto.req.AdminUserSearchReq" resultType="com.gneworks.dto.res.AdminUserRes">
+    select 
+      u.user_id as userId,
+      u.user_name as userName,
+      u.phone_num as phoneNum,
+      u.profile_img as profileImg,
+      u.role_id as roleId,
+      date_format(u.birthday, '%Y-%m-%d') as birthday,
+      u.gender,
+      u.postal_code as postalCode,
+      u.detail_address as detailAddress,
+      date_format(u.last_update, '%Y-%m-%d %H:%i') as lastUpdated,
+      date_format(u.last_update, '%Y-%m-%d %H:%i') as createTime,
+      coalesce(rc.region_count, 0) as regionCount,
+      coalesce(pc.report_count, 0) as reportCount
+    from user u
+    left join (
+      select user_id, count(*) as region_count
+      from user_assigned_region
+      group by user_id
+    ) rc on u.user_id = rc.user_id
+    left join (
+      select user_id, count(*) as report_count
+      from work_report
+      where delete_flg = 0
+      group by user_id
+    ) pc on u.user_id = pc.user_id
+    where u.delete_flg = 0
+      and u.role_id = 1
+      <if test="query != null and query != ''">
+        and (
+          u.user_name like concat('%', #{query}, '%')
+          or u.user_id like concat('%', #{query}, '%')
+          or u.phone_num like concat('%', #{query}, '%')
+        )
+      </if>
+    order by u.last_update desc
+    <if test="size != null and size > 0">
+      limit #{size} offset #{offset}
+    </if>
+  </select>
+
+  <!-- 계정 목록 건수 조회 -->
+  <select id="selectUserCount" parameterType="com.gneworks.dto.req.AdminUserSearchReq" resultType="long">
+    select count(*)
+    from user u
+    where u.delete_flg = 0
+      and u.role_id = 1
+      <if test="query != null and query != ''">
+        and (
+          u.user_name like concat('%', #{query}, '%')
+          or u.user_id like concat('%', #{query}, '%')
+          or u.phone_num like concat('%', #{query}, '%')
+        )
+      </if>
+  </select>
 </mapper>

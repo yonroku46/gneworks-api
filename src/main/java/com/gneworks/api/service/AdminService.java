@@ -16,21 +16,31 @@ import com.gneworks.dao.entity.User;
 import com.gneworks.dao.entity.UserAssignedRegion;
 import com.gneworks.dto.req.AdminHouseholdReq;
 import com.gneworks.dto.req.AdminInquiryAnswerReq;
+import com.gneworks.dto.req.AdminInquirySearchReq;
 import com.gneworks.dto.req.AdminReportSearchReq;
 import com.gneworks.dto.req.AdminReportStatusReq;
 import com.gneworks.dto.req.AdminSiteReq;
 import com.gneworks.dto.req.AdminUserReq;
+import com.gneworks.dto.req.AdminUserSearchReq;
 import com.gneworks.dto.res.ActionRes;
 import com.gneworks.dto.res.AdminInquiryRes;
+import com.gneworks.dto.res.AdminDashboardSummaryRes;
 import com.gneworks.dto.res.AdminInquirySummaryRes;
 import com.gneworks.dto.res.AdminSiteRes;
 import com.gneworks.dto.res.AdminUserRes;
+import com.gneworks.dto.res.AdminWorkerStatRes;
 import com.gneworks.dto.res.ListRes;
+import com.gneworks.dto.res.PageRes;
 import com.gneworks.dto.res.RegionWorkerRes;
 import com.gneworks.dto.res.UserAssignedRegionDetailRes;
 import com.gneworks.dto.res.WorkReportRes;
 import com.gneworks.dto.res.core.BaseResponse;
 import com.gneworks.dto.res.core.Information;
+import com.gneworks.common.utils.ExcelStreamingUtil;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -50,6 +60,7 @@ public class AdminService {
 
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
     private static final SimpleDateFormat DATETIME_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    private static final SimpleDateFormat BIRTH_PW_FORMAT = new SimpleDateFormat("yyMMdd");
     private static final Information INFO_SUCCESS = new Information("SUCCESS", "SUCCESS");
 
     @Autowired
@@ -122,7 +133,38 @@ public class AdminService {
     }
 
     /**
-     * 신규 작업자 계정 생성 (초기 비밀번호: 휴대폰번호 뒤 6자리 또는 숫자)
+     * 계정 목록 페이징 조회
+     */
+    @Transactional(readOnly = true)
+    public BaseResponse getUserListPaged(String operatorUserId, AdminUserSearchReq req) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
+        }
+        if (req == null) req = new AdminUserSearchReq();
+        long totalCount = userDao.selectUserCount(req);
+        List<AdminUserRes> users = totalCount > 0
+                ? userDao.selectUserListPaged(req)
+                : Collections.emptyList();
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new PageRes<>(users, totalCount, req.getPage(), req.getSize()));
+    }
+
+    /**
+     * 계정 목록 대용량 엑셀 스트리밍 다운로드
+     */
+    @Transactional(readOnly = true)
+    public void exportUsersExcel(String operatorUserId, AdminUserSearchReq req, HttpServletResponse response) throws IOException {
+        if (isNotAdmin(operatorUserId)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "ACCESS_DENIED");
+            return;
+        }
+        if (req == null) req = new AdminUserSearchReq();
+        req.setSize(null);
+        List<AdminUserRes> users = userDao.selectUserListPaged(req);
+        ExcelStreamingUtil.export(response, "계정목록", users, AdminUserRes.class);
+    }
+
+    /**
+     * 신규 작업자 계정 생성 (기본 아이디: 하이픈 없는 휴대폰번호, 초기 비밀번호: 생년월일 6자리 yyMMdd)
      */
     @Transactional
     public BaseResponse createUser(String operatorUserId, AdminUserReq req) {
@@ -130,9 +172,6 @@ public class AdminService {
             return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "FORBIDDEN"));
         }
 
-        if (req.getUserId() == null || req.getUserId().trim().isEmpty()) {
-            return ResponseUtils.generateDtoFailed(new Information("INVALID_USER_ID", "USER_ID_REQUIRED"));
-        }
         if (req.getUserName() == null || req.getUserName().trim().isEmpty()) {
             return ResponseUtils.generateDtoFailed(new Information("INVALID_USER_NAME", "USER_NAME_REQUIRED"));
         }
@@ -140,18 +179,27 @@ public class AdminService {
             return ResponseUtils.generateDtoFailed(new Information("INVALID_PHONE_NUM", "PHONE_NUM_REQUIRED"));
         }
 
-        User exist = userDao.findUser(req.getUserId().trim());
+        // 아이디: 입력된 값이 없으면 하이픈 없는 전화번호로 자동 설정
+        String targetUserId = req.getUserId();
+        if (targetUserId == null || targetUserId.trim().isEmpty()) {
+            targetUserId = req.getPhoneNum().replaceAll("[^0-9]", "");
+        } else {
+            targetUserId = targetUserId.trim();
+        }
+
+        if (targetUserId.isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_USER_ID", "USER_ID_REQUIRED"));
+        }
+
+        User exist = userDao.findUser(targetUserId);
         if (exist != null) {
             return ResponseUtils.generateDtoFailed(new Information("DUPLICATE_USER_ID", "ALREADY_EXISTS"));
         }
 
         User newUser = new User();
-        newUser.setUserId(req.getUserId().trim());
+        newUser.setUserId(targetUserId);
         newUser.setUserName(req.getUserName().trim());
-        newUser.setPhoneNum(req.getPhoneNum().trim());
-        // 초기 비밀번호 세팅
-        String rawPw = req.getPhoneNum().replaceAll("[^0-9]", "");
-        newUser.setUserPw(passwordEncoder.encode(rawPw));
+        newUser.setPhoneNum(formatPhoneNumber(req.getPhoneNum()));
         newUser.setRoleId(Roles.CLIENT.getValue()); // 작업자 권한(1) 부여
         newUser.setGender(req.getGender());
         newUser.setPostalCode(req.getPostalCode());
@@ -159,13 +207,20 @@ public class AdminService {
         newUser.setDeleteFlg((byte) 0);
         newUser.setLastUpdate(new Date());
 
-        if (req.getBirthday() != null && !req.getBirthday().trim().isEmpty()) {
-            try {
-                newUser.setBirthday(DATE_FORMAT.parse(req.getBirthday().trim()));
-            } catch (Exception e) {
-                log.warn("Invalid birthday format: {}", req.getBirthday());
-            }
+        if (req.getBirthday() == null || req.getBirthday().trim().isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_BIRTHDAY", "BIRTHDAY_REQUIRED"));
         }
+
+        try {
+            newUser.setBirthday(DATE_FORMAT.parse(req.getBirthday().trim()));
+        } catch (Exception e) {
+            log.warn("Invalid birthday format: {}", req.getBirthday());
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_BIRTHDAY", "INVALID_BIRTHDAY_FORMAT"));
+        }
+
+        // 초기 비밀번호 세팅: 생년월일 6자리(yyMMdd) 필수 (전화번호 대체 불가)
+        String rawPw = BIRTH_PW_FORMAT.format(newUser.getBirthday());
+        newUser.setUserPw(passwordEncoder.encode(rawPw));
 
         userDao.insertUser(newUser);
 
@@ -195,7 +250,7 @@ public class AdminService {
         }
 
         if (req.getUserName() != null) user.setUserName(req.getUserName().trim());
-        if (req.getPhoneNum() != null) user.setPhoneNum(req.getPhoneNum().trim());
+        if (req.getPhoneNum() != null) user.setPhoneNum(formatPhoneNumber(req.getPhoneNum()));
         if (req.getGender() != null) user.setGender(req.getGender());
         if (req.getPostalCode() != null) user.setPostalCode(req.getPostalCode());
         if (req.getDetailAddress() != null) user.setDetailAddress(req.getDetailAddress());
@@ -205,6 +260,7 @@ public class AdminService {
                 user.setBirthday(DATE_FORMAT.parse(req.getBirthday().trim()));
             } catch (Exception e) {
                 log.warn("Invalid birthday format: {}", req.getBirthday());
+                return ResponseUtils.generateDtoFailed(new Information("INVALID_BIRTHDAY", "INVALID_BIRTHDAY_FORMAT"));
             }
         }
 
@@ -218,7 +274,7 @@ public class AdminService {
     }
 
     /**
-     * 비밀번호 초기화
+     * 비밀번호 초기화 (생년월일 6자리 yyMMdd 필수)
      */
     @Transactional
     public BaseResponse resetPassword(String operatorUserId, String targetUserId) {
@@ -235,12 +291,12 @@ public class AdminService {
             return ResponseUtils.generateDtoFailed(new Information(MessageIdConst.E_USER_NOT_FOUND, "USER_NOT_FOUND"));
         }
 
-        String phone = user.getPhoneNum();
-        if (phone == null || phone.trim().isEmpty()) {
-            return ResponseUtils.generateDtoFailed(new Information("PHONE_NUM_EMPTY", "CANNOT_RESET"));
+        // 비밀번호 초기화: 생년월일 6자리(yyMMdd) 필수 (전화번호로 대체 불가)
+        if (user.getBirthday() == null) {
+            return ResponseUtils.generateDtoFailed(new Information("CANNOT_RESET_PASSWORD", "BIRTHDAY_REQUIRED_FOR_RESET"));
         }
 
-        String rawPw = phone.replaceAll("[^0-9]", "");
+        String rawPw = BIRTH_PW_FORMAT.format(user.getBirthday());
         String encodedPw = passwordEncoder.encode(rawPw);
         userDao.updatePassword(user.getUserId(), encodedPw);
 
@@ -280,16 +336,54 @@ public class AdminService {
 
     // ── [2. 현장 / 세대 관리] ────────────────────────────────────
 
+
     /**
-     * 현장 목록 조회
+     * 현장 목록 조회 (대시보드 등 연동용: regionId, query, limit, orderBy 지원)
      */
     @Transactional(readOnly = true)
-    public BaseResponse getSiteList(String operatorUserId, String sido, String sigungu, String eupmyeondong, String query) {
+    public BaseResponse getSiteList(String operatorUserId, String regionId, String query, Integer limit, String orderBy) {
         if (isNotAdmin(operatorUserId)) {
             return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
         }
-        List<AdminSiteRes> sites = siteDao.selectSiteList(sido, sigungu, eupmyeondong, query);
-        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(sites));
+        List<AdminSiteRes> sites = siteDao.selectSiteList(regionId, query, limit, orderBy);
+        long totalCount = limit != null
+                ? siteDao.selectSiteListCount(regionId, query)
+                : (sites != null ? sites.size() : 0);
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(sites, (int) totalCount));
+    }
+
+    /**
+     * 현장 목록 페이징 조회
+     */
+    @Transactional(readOnly = true)
+    public BaseResponse getSiteListPaged(String operatorUserId, String regionId, String query, int page, int size) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
+        }
+        if (page < 1) page = 1;
+        if (size < 1) size = 30;
+        if (size > 100) size = 100;
+
+        long totalCount = siteDao.selectSiteListCount(regionId, query);
+        List<AdminSiteRes> sites = totalCount > 0
+                ? siteDao.selectSiteListPaged(regionId, query, page, size)
+                : Collections.emptyList();
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new PageRes<>(sites, totalCount, page, size));
+    }
+
+    /**
+     * 현장 목록 대용량 엑셀 스트리밍 다운로드 (제네릭 ExcelStreamingUtil 활용)
+     */
+    @Transactional(readOnly = true)
+    public void exportSitesExcel(String operatorUserId, String regionId, String query, HttpServletResponse response) throws IOException {
+        if (isNotAdmin(operatorUserId)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "ACCESS_DENIED");
+            return;
+        }
+
+        List<AdminSiteRes> sites = siteDao.selectSiteList(regionId, query, null, null);
+        ExcelStreamingUtil.export(response, "현장목록", sites, AdminSiteRes.class);
     }
 
     /**
@@ -314,7 +408,7 @@ public class AdminService {
         // regionId(외래키)를 기반으로 해당 소방관할에 배정된 작업자 목록 직접 조회
         List<RegionWorkerRes> workers = null;
         if (detail.getRegionId() != null && !detail.getRegionId().trim().isEmpty()) {
-            workers = siteDao.selectRegionWorkers(null, null, detail.getRegionId().trim());
+            workers = siteDao.selectRegionWorkers(detail.getRegionId().trim());
         }
         if (workers == null) {
             workers = new ArrayList<>();
@@ -477,24 +571,16 @@ public class AdminService {
     }
 
     /**
-     * 특정 지역(시도, 시군구) 기반 담당 작업자 목록 조회
+     * 특정 지역 기반 담당 작업자 목록 조회
      */
     @Transactional(readOnly = true)
-    public BaseResponse getRegionWorkers(String operatorUserId, String sido, String sigungu) {
-        return getRegionWorkers(operatorUserId, sido, sigungu, null);
-    }
-
-    @Transactional(readOnly = true)
-    public BaseResponse getRegionWorkers(String operatorUserId, String sido, String sigungu, String regionId) {
+    public BaseResponse getRegionWorkers(String operatorUserId, String regionId) {
         if (isNotAdmin(operatorUserId)) {
             return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
         }
         List<RegionWorkerRes> workers = null;
         if (regionId != null && !regionId.trim().isEmpty()) {
-            workers = siteDao.selectRegionWorkers(null, null, regionId.trim());
-        }
-        if (workers == null || workers.isEmpty()) {
-            workers = siteDao.selectRegionWorkers(sido, sigungu, null);
+            workers = siteDao.selectRegionWorkers(regionId.trim());
         }
         if (workers == null) {
             workers = new ArrayList<>();
@@ -533,20 +619,26 @@ public class AdminService {
      */
     @Transactional
     public BaseResponse assignRegion(String operatorUserId, String targetUserId, String sidoName, String regionName) {
+        return assignRegion(operatorUserId, targetUserId, null, sidoName, regionName);
+    }
+
+    @Transactional
+    public BaseResponse assignRegion(String operatorUserId, String targetUserId, String regionId, String sidoName, String regionName) {
         if (isNotAdmin(operatorUserId)) {
             return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
         }
         if (targetUserId == null || targetUserId.trim().isEmpty()) {
             return ResponseUtils.generateDtoFailed(new Information("INVALID_USER_ID", "INVALID_USER_ID"));
         }
-        FireRegion fireRegion = siteDao.selectFireRegionBySidoAndName(sidoName, regionName);
-        // "안산시" <-> "안산" 등 시/군/구 명칭 유연 검색 지원
-        if (fireRegion == null && regionName != null && regionName.length() > 1) {
-            String trimmedName = regionName.replaceAll("(시|군|구)$", "");
-            fireRegion = siteDao.selectFireRegionBySidoAndName(sidoName, trimmedName);
+
+        FireRegion fireRegion = null;
+        // 1순위: regionId 고유 식별자 직접 조회
+        if (regionId != null && !regionId.trim().isEmpty()) {
+            fireRegion = siteDao.selectFireRegionById(regionId.trim());
         }
-        if (fireRegion == null && regionName != null) {
-            fireRegion = siteDao.selectFireRegionBySidoAndName(sidoName, regionName + "시");
+        // 2순위: 시도 및 소방관할서 명칭 완전 일치 조회
+        if (fireRegion == null && sidoName != null && regionName != null) {
+            fireRegion = siteDao.selectFireRegionBySidoAndName(sidoName.trim(), regionName.trim());
         }
         if (fireRegion == null) {
             return ResponseUtils.generateDtoFailed(new Information("NOT_FOUND", "NOT_FOUND " + sidoName + " " + regionName));
@@ -617,6 +709,42 @@ public class AdminService {
                 new Information(MessageIdConst.I_GETTING_SUCCESS, "SUCCESS"),
                 listRes
         );
+    }
+
+    /**
+     * 문의 목록 페이징 조회
+     */
+    @Transactional(readOnly = true)
+    public BaseResponse getInquiryListPaged(String operatorUserId, AdminInquirySearchReq req) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
+        }
+        if (req == null) req = new AdminInquirySearchReq();
+        long totalCount = inquiryDao.selectInquiryCount(req);
+        List<AdminInquiryRes> inquiries = totalCount > 0
+                ? inquiryDao.selectInquiryListPaged(req)
+                : Collections.emptyList();
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new PageRes<>(inquiries, totalCount, req.getPage(), req.getSize()));
+    }
+
+    /**
+     * 문의 목록 대용량 엑셀 스트리밍 다운로드
+     */
+    @Transactional(readOnly = true)
+    public void exportInquiriesExcel(String operatorUserId, AdminInquirySearchReq req, HttpServletResponse response) throws IOException {
+        if (isNotAdmin(operatorUserId)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "ACCESS_DENIED");
+            return;
+        }
+        if (req == null) req = new AdminInquirySearchReq();
+        req.setSize(null);
+        List<AdminInquiryRes> inquiries = inquiryDao.selectInquiryListPaged(req);
+        if (inquiries != null) {
+            for (AdminInquiryRes inq : inquiries) {
+                inq.setStatusText(inq.getStatusText());
+            }
+        }
+        ExcelStreamingUtil.export(response, "문의내역", inquiries, AdminInquiryRes.class);
     }
 
     /**
@@ -768,7 +896,101 @@ public class AdminService {
             }
         }
 
-        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(list));
+        long totalCount = (req != null && req.getLimit() != null)
+                ? workReportDao.selectReportCount(req)
+                : list.size();
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(list, (int) totalCount));
+    }
+
+    /**
+     * 시공 보고서 목록 페이징 조회
+     */
+    @Transactional(readOnly = true)
+    public BaseResponse getReportListPaged(String operatorUserId, AdminReportSearchReq req) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
+        }
+        if (req == null) req = new AdminReportSearchReq();
+        if (req.getPage() <= 0) req.setPage(1);
+        if (req.getSize() == null || req.getSize() <= 0) req.setSize(30);
+        long totalCount = workReportDao.selectReportCount(req);
+        List<WorkReportRes> list = totalCount > 0
+                ? workReportDao.selectReportList(req)
+                : Collections.emptyList();
+        for (WorkReportRes res : list) {
+            enrichReportRes(res);
+        }
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new PageRes<>(list, totalCount, req.getPage(), req.getSize()));
+    }
+
+    /**
+     * 시공 보고서 목록 대용량 엑셀 스트리밍 다운로드
+     */
+    @Transactional(readOnly = true)
+    public void exportReportsExcel(String operatorUserId, AdminReportSearchReq req, HttpServletResponse response) throws IOException {
+        if (isNotAdmin(operatorUserId)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "ACCESS_DENIED");
+            return;
+        }
+        if (req == null) req = new AdminReportSearchReq();
+        req.setSize(null);
+        req.setLimit(null);
+        List<WorkReportRes> list = workReportDao.selectReportList(req);
+        if (list != null) {
+            for (WorkReportRes res : list) {
+                enrichReportRes(res);
+            }
+        } else {
+            list = Collections.emptyList();
+        }
+        ExcelStreamingUtil.export(response, "시공보고서목록", list, WorkReportRes.class);
+    }
+
+    /**
+     * 작업자 실적 랭킹 목록 조회 (대시보드 전용: limit 지원)
+     */
+    @Transactional(readOnly = true)
+    public BaseResponse getWorkerRanking(String operatorUserId, String regionId, Integer limit) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
+        }
+        if (limit == null || limit <= 0) limit = 10;
+        List<AdminWorkerStatRes> list = workReportDao.selectWorkerRanking(regionId, limit);
+        long totalCount = workReportDao.selectWorkerRankingCount(regionId);
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(list != null ? list : Collections.emptyList(), (int) totalCount));
+    }
+
+    @Transactional(readOnly = true)
+    public BaseResponse getDashboardSummary(String operatorUserId, String regionId) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
+        }
+
+        Map<String, Object> householdMap = siteDao.selectRegionalHouseholdSummary(regionId);
+        Map<String, Object> reportMap = workReportDao.selectReportSummary(regionId);
+        long totalWorkers = workReportDao.selectWorkerRankingCount(regionId);
+
+        AdminDashboardSummaryRes res = new AdminDashboardSummaryRes();
+        if (householdMap != null) {
+            res.setTotalSites(((Number) householdMap.getOrDefault("totalSites", 0L)).longValue());
+            res.setTotalTarget(((Number) householdMap.getOrDefault("totalTarget", 0L)).longValue());
+            res.setCompletedTarget(((Number) householdMap.getOrDefault("completedTarget", 0L)).longValue());
+        }
+        if (reportMap != null) {
+            res.setTotalReports(((Number) reportMap.getOrDefault("totalReports", 0L)).longValue());
+            res.setTodayReports(((Number) reportMap.getOrDefault("todayReports", 0L)).longValue());
+            res.setPendingReports(((Number) reportMap.getOrDefault("pendingReports", 0L)).longValue());
+            res.setRejectedReports(((Number) reportMap.getOrDefault("rejectedReports", 0L)).longValue());
+            res.setCompletedReports(((Number) reportMap.getOrDefault("completedReports", 0L)).longValue());
+            res.setIssueReportsCount(((Number) reportMap.getOrDefault("issueReportsCount", 0L)).longValue());
+        }
+        res.setTotalWorkers(totalWorkers);
+        if (res.getTotalTarget() > 0) {
+            res.setProgressRate((int) Math.round(((double) res.getCompletedTarget() / res.getTotalTarget()) * 100));
+        }
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
     }
 
     /**
@@ -847,12 +1069,47 @@ public class AdminService {
         if (res.getInstallDate() != null && !res.getInstallDate().trim().isEmpty()) {
             try {
                 Date d = DATE_FORMAT.parse(res.getInstallDate().trim());
-                SimpleDateFormat koreanDateFmt = new SimpleDateFormat("yyyy년 M월 D일");
+                SimpleDateFormat koreanDateFmt = new SimpleDateFormat("yyyy년 M월 d일");
                 res.setInstallDateFormatted(koreanDateFmt.format(d));
             } catch (Exception ignored) {}
         }
         if (res.getSubmittedAt() == null && res.getReportTime() != null) {
             res.setSubmittedAt(res.getReportTime());
         }
+    }
+
+    private String formatPhoneNumber(String phone) {
+        if (phone == null) return null;
+        String digits = phone.replaceAll("[^0-9]", "");
+        if (digits.isEmpty()) return "";
+
+        // 전국 대표번호 (15xx, 16xx 등 8자리)
+        if (digits.startsWith("1") && digits.length() == 8) {
+            return digits.replaceFirst("(\\d{4})(\\d{4})", "$1-$2");
+        }
+        // 평생/안심번호 (050x 11~12자리)
+        if (digits.startsWith("050")) {
+            if (digits.length() == 12) {
+                return digits.replaceFirst("(\\d{4})(\\d{4})(\\d{4})", "$1-$2-$3");
+            } else if (digits.length() == 11) {
+                return digits.replaceFirst("(\\d{4})(\\d{3})(\\d{4})", "$1-$2-$3");
+            }
+        }
+        // 서울 지역 유선전화 (02)
+        if (digits.startsWith("02")) {
+            if (digits.length() == 10) {
+                return digits.replaceFirst("(\\d{2})(\\d{4})(\\d{4})", "$1-$2-$3");
+            } else if (digits.length() == 9) {
+                return digits.replaceFirst("(\\d{2})(\\d{3})(\\d{4})", "$1-$2-$3");
+            }
+        }
+        // 전국 지역 유선전화(031~064), 휴대폰(010 등), 인터넷전화(070)
+        if (digits.length() == 11) {
+            return digits.replaceFirst("(\\d{3})(\\d{4})(\\d{4})", "$1-$2-$3");
+        } else if (digits.length() == 10) {
+            return digits.replaceFirst("(\\d{3})(\\d{3})(\\d{4})", "$1-$2-$3");
+        }
+
+        return phone.trim();
     }
 }

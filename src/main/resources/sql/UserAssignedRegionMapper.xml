@@ -98,19 +98,9 @@
     left join fire_region all_fr on all_uar.region_id = all_fr.region_id
     where u.delete_flg = 0
       and u.role_id = 1
-      <choose>
-        <when test="regionId != null and regionId != ''">
-          and target_uar.region_id = #{regionId}
-        </when>
-        <otherwise>
-          <if test="sido != null and sido != '' and sido != 'ALL'">
-            and target_fr.sido_name = #{sido}
-          </if>
-          <if test="sigungu != null and sigungu != '' and sigungu != 'ALL'">
-            and target_fr.name = #{sigungu}
-          </if>
-        </otherwise>
-      </choose>
+      <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+        and target_uar.region_id = #{regionId}
+      </if>
     order by u.last_update desc, all_uar.create_time asc
   </select>
 </mapper>

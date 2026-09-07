@@ -19,9 +19,5 @@ public interface UserAssignedRegionMapper {
 
     List<UserAssignedRegionDetailRes> selectAssignedRegionsByUserId(@Param("userId") String userId);
 
-    List<RegionWorkerRes> selectRegionWorkers(
-            @Param("sido") String sido,
-            @Param("sigungu") String sigungu,
-            @Param("regionId") String regionId
-    );
+    List<RegionWorkerRes> selectRegionWorkers(@Param("regionId") String regionId);
 }

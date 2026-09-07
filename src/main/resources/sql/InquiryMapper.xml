@@ -116,4 +116,97 @@
       and coalesce(delete_flg, 0) = 0
     order by create_time desc
   </select>
+
+  <!-- 문의 목록 검색 및 페이징/전체 조회 -->
+  <select id="selectInquiryListPaged" parameterType="com.gneworks.dto.req.AdminInquirySearchReq" resultType="com.gneworks.dto.res.AdminInquiryRes">
+    select 
+      inquiry_id as inquiryId,
+      user_id as userId,
+      case inquiry_type
+        when 'password_reset' then '비밀번호 재발급'
+        when 'account' then '계정/권한 문의'
+        when 'task_report' then '작업배정/현장보고'
+        when 'bug' then '오류/버그 신고'
+        when 'feature' then '기능개선 제안'
+        when 'general' then '일반/기타 문의'
+        else coalesce(inquiry_type, '일반문의')
+      end as inquiryType,
+      phone_num as phoneNum,
+      user_name as userName,
+      answer_user_name as answerUserName,
+      date_format(create_time, '%Y-%m-%d %H:%i') as createTime,
+      date_format(answer_time, '%Y-%m-%d %H:%i') as answerTime,
+      processed_flg as processedFlg,
+      case when coalesce(processed_flg, 0) = 1 then '답변완료' else '답변대기' end as statusText,
+      delete_flg as deleteFlg,
+      inquiry_contents as inquiryContents,
+      answer_contents as answerContents
+    from inquiry
+    where coalesce(delete_flg, 0) = 0
+    <if test="status != null and status != '' and status != 'ALL'">
+      <choose>
+        <when test="status == 'RESOLVED' or status == 'true'">
+          and coalesce(processed_flg, 0) = 1
+        </when>
+        <when test="status == 'WAITING' or status == 'false'">
+          and coalesce(processed_flg, 0) = 0
+        </when>
+      </choose>
+    </if>
+    <if test="inquiryType != null and inquiryType != '' and inquiryType != 'ALL'">
+      and inquiry_type = #{inquiryType}
+    </if>
+    <if test="startDate != null and startDate != ''">
+      and create_time &gt;= concat(#{startDate}, ' 00:00:00')
+    </if>
+    <if test="endDate != null and endDate != ''">
+      and create_time &lt;= concat(#{endDate}, ' 23:59:59')
+    </if>
+    <if test="query != null and query != ''">
+      and (
+        user_name like concat('%', #{query}, '%')
+        or user_id like concat('%', #{query}, '%')
+        or phone_num like concat('%', #{query}, '%')
+        or inquiry_contents like concat('%', #{query}, '%')
+      )
+    </if>
+    order by create_time desc
+    <if test="size != null and size > 0">
+      limit #{size} offset #{offset}
+    </if>
+  </select>
+
+  <!-- 문의 목록 건수 조회 -->
+  <select id="selectInquiryCount" parameterType="com.gneworks.dto.req.AdminInquirySearchReq" resultType="long">
+    select count(*)
+    from inquiry
+    where coalesce(delete_flg, 0) = 0
+    <if test="status != null and status != '' and status != 'ALL'">
+      <choose>
+        <when test="status == 'RESOLVED' or status == 'true'">
+          and coalesce(processed_flg, 0) = 1
+        </when>
+        <when test="status == 'WAITING' or status == 'false'">
+          and coalesce(processed_flg, 0) = 0
+        </when>
+      </choose>
+    </if>
+    <if test="inquiryType != null and inquiryType != '' and inquiryType != 'ALL'">
+      and inquiry_type = #{inquiryType}
+    </if>
+    <if test="startDate != null and startDate != ''">
+      and create_time &gt;= concat(#{startDate}, ' 00:00:00')
+    </if>
+    <if test="endDate != null and endDate != ''">
+      and create_time &lt;= concat(#{endDate}, ' 23:59:59')
+    </if>
+    <if test="query != null and query != ''">
+      and (
+        user_name like concat('%', #{query}, '%')
+        or user_id like concat('%', #{query}, '%')
+        or phone_num like concat('%', #{query}, '%')
+        or inquiry_contents like concat('%', #{query}, '%')
+      )
+    </if>
+  </select>
 </mapper>

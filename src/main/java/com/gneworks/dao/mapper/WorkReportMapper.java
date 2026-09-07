@@ -2,10 +2,12 @@ package com.gneworks.dao.mapper;
 
 import com.gneworks.dao.entity.WorkReport;
 import com.gneworks.dto.req.AdminReportSearchReq;
+import com.gneworks.dto.res.AdminWorkerStatRes;
 import com.gneworks.dto.res.WorkReportRes;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import java.util.Map;
 
 public interface WorkReportMapper {
     /**
@@ -51,5 +53,20 @@ public interface WorkReportMapper {
             @Param("reportId") String reportId,
             @Param("status") String status,
             @Param("fixReason") String fixReason
+    );
+
+    long selectReportCount(AdminReportSearchReq req);
+
+    List<AdminWorkerStatRes> selectWorkerRanking(
+            @Param("regionId") String regionId,
+            @Param("limit") Integer limit
+    );
+
+    long selectWorkerRankingCount(
+            @Param("regionId") String regionId
+    );
+
+    Map<String, Object> selectReportSummary(
+            @Param("regionId") String regionId
     );
 }

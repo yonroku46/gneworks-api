@@ -5,6 +5,8 @@ import com.gneworks.common.constants.MessageIdConst;
 import com.gneworks.common.utils.StringUtils;
 import com.gneworks.dao.entity.Inquiry;
 import com.gneworks.dao.mapper.InquiryMapper;
+import com.gneworks.dto.req.AdminInquirySearchReq;
+import com.gneworks.dto.res.AdminInquiryRes;
 import com.gneworks.exception.SystemException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -124,6 +126,34 @@ public class InquiryDao {
             final String methodName = "InquiryMapper#selectByUserId";
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("userId", userId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public List<AdminInquiryRes> selectInquiryListPaged(AdminInquirySearchReq req) {
+        try {
+            return inquiryMapper.selectInquiryListPaged(req);
+        } catch (Exception exception) {
+            final String methodName = "InquiryMapper#selectInquiryListPaged";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("req", req);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public long selectInquiryCount(AdminInquirySearchReq req) {
+        try {
+            return inquiryMapper.selectInquiryCount(req);
+        } catch (Exception exception) {
+            final String methodName = "InquiryMapper#selectInquiryCount";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("req", req);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
             log.error(overview + detail);

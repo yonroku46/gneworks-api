@@ -17,10 +17,13 @@ import com.gneworks.dao.entity.Inquiry;
 import com.gneworks.dao.entity.User;
 import com.gneworks.dao.entity.UserAssignedRegion;
 import com.gneworks.dto.res.ActionRes;
+import com.gneworks.dto.res.AdminDashboardSummaryRes;
 import com.gneworks.dto.res.AdminSiteRes;
 import com.gneworks.dto.res.HouseholdRes;
 import com.gneworks.dto.res.ListRes;
+import com.gneworks.dto.res.PageRes;
 import com.gneworks.dto.res.UserAssignedRegionDetailRes;
+import java.util.Collections;
 import com.gneworks.dto.res.UserRes;
 import com.gneworks.dto.res.core.BaseResponse;
 import com.gneworks.dto.res.core.Information;
@@ -29,6 +32,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -71,6 +75,9 @@ public class PortalService {
 
     @Autowired
     private AmazonS3 amazonS3;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Value("${cloud.aws.s3.prefix.user}")
     private String userPrefix;
@@ -184,6 +191,47 @@ public class PortalService {
                 messageSource.getMessage(MessageIdConst.I_UPDATE_SUCCESS, new String[] { "User" }, LocaleAspect.LOCALE)), res);
     }
 
+    /**
+     * 본인 비밀번호 변경
+     */
+    @Transactional
+    public BaseResponse changePassword(String userId, String currentPassword, String newPassword) {
+        if (userId == null || userId.trim().isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_USER", "LOGIN_REQUIRED"));
+        }
+
+        if (currentPassword == null || currentPassword.trim().isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("CURRENT_PASSWORD_REQUIRED", "현재 비밀번호를 입력해 주세요."));
+        }
+
+        if (newPassword == null || newPassword.trim().isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("NEW_PASSWORD_REQUIRED", "새 비밀번호를 입력해 주세요."));
+        }
+
+        if (newPassword.trim().length() < 6) {
+            return ResponseUtils.generateDtoFailed(new Information("PASSWORD_TOO_SHORT", "새 비밀번호는 최소 6자 이상이어야 합니다."));
+        }
+
+        User user = userDao.findUser(userId);
+        if (user == null) {
+            return ResponseUtils.generateDtoFailed(new Information(MessageIdConst.E_USER_NOT_FOUND,
+                    messageSource.getMessage(MessageIdConst.E_USER_NOT_FOUND, null, LocaleAspect.LOCALE)));
+        }
+
+        if (!passwordEncoder.matches(currentPassword, user.getUserPw())) {
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_CURRENT_PASSWORD", "현재 비밀번호가 일치하지 않습니다."));
+        }
+
+        if (currentPassword.equals(newPassword.trim())) {
+            return ResponseUtils.generateDtoFailed(new Information("SAME_AS_OLD_PASSWORD", "기존 비밀번호와 동일한 비밀번호로는 변경할 수 없습니다."));
+        }
+
+        String encodedNewPw = passwordEncoder.encode(newPassword.trim());
+        userDao.updatePassword(userId, encodedNewPw);
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ActionRes(userId));
+    }
+
     // ── [2. 담당 지역 관리 (본인 전용)] ────────────────────────────
 
     /**
@@ -209,21 +257,23 @@ public class PortalService {
      */
     @Transactional
     public BaseResponse assignRegion(String userId, String sidoName, String regionName) {
+        return assignRegion(userId, null, sidoName, regionName);
+    }
+
+    @Transactional
+    public BaseResponse assignRegion(String userId, String regionId, String sidoName, String regionName) {
         if (userId == null || userId.trim().isEmpty()) {
             return ResponseUtils.generateDtoFailed(new Information("INVALID_USER", "LOGIN_REQUIRED"));
         }
-        if (sidoName == null || sidoName.trim().isEmpty() || regionName == null || regionName.trim().isEmpty()) {
-            return ResponseUtils.generateDtoFailed(new Information("INVALID_REGION", "SIDO_AND_REGION_REQUIRED"));
-        }
 
-        FireRegion fireRegion = siteDao.selectFireRegionBySidoAndName(sidoName, regionName);
-        // "안산시" <-> "안산" 등 유연 매칭 지원
-        if (fireRegion == null && regionName.length() > 1) {
-            String trimmedName = regionName.replaceAll("(시|군|구)$", "");
-            fireRegion = siteDao.selectFireRegionBySidoAndName(sidoName, trimmedName);
+        FireRegion fireRegion = null;
+        // 1순위: regionId 고유 식별자 직접 조회
+        if (regionId != null && !regionId.trim().isEmpty()) {
+            fireRegion = siteDao.selectFireRegionById(regionId.trim());
         }
-        if (fireRegion == null) {
-            fireRegion = siteDao.selectFireRegionBySidoAndName(sidoName, regionName + "시");
+        // 2순위: 시도 및 소방관할서 명칭 완전 일치 조회
+        if (fireRegion == null && sidoName != null && regionName != null) {
+            fireRegion = siteDao.selectFireRegionBySidoAndName(sidoName.trim(), regionName.trim());
         }
         if (fireRegion == null) {
             return ResponseUtils.generateDtoFailed(new Information("NOT_FOUND", "NOT_FOUND " + sidoName + " " + regionName));
@@ -290,8 +340,11 @@ public class PortalService {
      * 현장 목록 조회 (세대 목록 포함 여부 선택 가능)
      */
     @Transactional(readOnly = true)
-    public BaseResponse getSites(String sido, String sigungu, String eupmyeondong, String query, Boolean includeHouseholds) {
-        List<AdminSiteRes> list = siteDao.selectSiteList(sido, sigungu, eupmyeondong, query);
+    public BaseResponse getSites(String regionId, String query, Integer limit, Boolean includeHouseholds) {
+        List<AdminSiteRes> list = siteDao.selectSiteList(regionId, query, limit, null);
+        long totalCount = limit != null
+                ? siteDao.selectSiteListCount(regionId, query)
+                : (list != null ? list.size() : 0);
         if (list == null) {
             list = new ArrayList<>();
         }
@@ -305,7 +358,25 @@ public class PortalService {
             }
         }
 
-        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(list));
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(list, (int) totalCount));
+    }
+
+    /**
+     * 권역별 세대수 및 현장수 요약 집계
+     */
+    @Transactional(readOnly = true)
+    public BaseResponse getRegionSummary(String regionId) {
+        Map<String, Object> summary = siteDao.selectRegionalHouseholdSummary(regionId);
+        AdminDashboardSummaryRes res = new AdminDashboardSummaryRes();
+        if (summary != null) {
+            res.setTotalSites(((Number) summary.getOrDefault("totalSites", 0L)).longValue());
+            res.setTotalTarget(((Number) summary.getOrDefault("totalTarget", 0L)).longValue());
+            res.setCompletedTarget(((Number) summary.getOrDefault("completedTarget", 0L)).longValue());
+            if (res.getTotalTarget() > 0) {
+                res.setProgressRate((int) Math.round((double) res.getCompletedTarget() / res.getTotalTarget() * 100));
+            }
+        }
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
     }
 
     /**
@@ -526,72 +597,46 @@ public class PortalService {
             req = new AdminReportSearchReq();
         }
 
-        List<WorkReportRes> list;
-
-        // 1. 특정 현장 ID가 지정된 경우
-        if (req.getSiteId() != null && !req.getSiteId().trim().isEmpty()) {
-            list = workReportDao.selectReportList(req);
-        }
-        // 2. 특정 시도/시군구가 지정된 경우
-        else if ((req.getSido() != null && !req.getSido().trim().isEmpty())
-                || (req.getSigungu() != null && !req.getSigungu().trim().isEmpty())) {
-            list = workReportDao.selectReportList(req);
-        }
-        // 3. 조건 없이 호출된 경우: 작업자 본인 작성 보고서 100% 보장 및 배정 관할 지역 현장 보고서 수집
-        else {
-            Map<String, WorkReportRes> reportMap = new HashMap<>();
-
-            // A. 작업자 본인이 작성한 보고서는 무조건 최우선 포함
-            AdminReportSearchReq myReq = new AdminReportSearchReq();
-            myReq.setUserId(userId);
-            List<WorkReportRes> myList = workReportDao.selectReportList(myReq);
-            if (myList != null) {
-                for (WorkReportRes r : myList) {
-                    reportMap.put(r.getReportId(), r);
-                }
-            }
-
-            // B. 배정된 관할 지역(region_id)에 해당하는 현장들의 보고서 수집
+        // 특정 현장이나 소방관할이 지정되지 않은 경우, 작업자 본인 보고서 + 배정된 관할 지역 보고서 대상
+        if ((req.getSiteId() == null || req.getSiteId().trim().isEmpty())
+                && (req.getRegionId() == null || req.getRegionId().trim().isEmpty())) {
+            req.setPortalUserId(userId);
             List<UserAssignedRegionDetailRes> assigned = siteDao.selectAssignedRegionsByUserId(userId);
             if (assigned != null && !assigned.isEmpty()) {
-                Set<String> assignedRegionIds = assigned.stream()
+                List<String> regionIds = assigned.stream()
                         .map(UserAssignedRegionDetailRes::getRegionId)
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toSet());
-
-                List<AdminSiteRes> sites = siteDao.selectSiteList(null, null, null, null);
-                if (sites != null) {
-                    for (AdminSiteRes site : sites) {
-                        if (site.getRegionId() != null && assignedRegionIds.contains(site.getRegionId()) && site.getSiteId() != null) {
-                            AdminReportSearchReq siteReq = new AdminReportSearchReq();
-                            siteReq.setSiteId(site.getSiteId());
-                            List<WorkReportRes> siteReports = workReportDao.selectReportList(siteReq);
-                            if (siteReports != null) {
-                                for (WorkReportRes r : siteReports) {
-                                    reportMap.put(r.getReportId(), r);
-                                }
-                            }
-                        }
-                    }
-                }
+                        .collect(Collectors.toList());
+                req.setAssignedRegionIds(regionIds);
             }
-            list = new ArrayList<>(reportMap.values());
         }
 
-        if (list == null) {
-            list = new ArrayList<>();
+        boolean isPaged = (req.getPage() != null && req.getPage() > 0) || (req.getSize() != null && req.getSize() > 0);
+        if (isPaged) {
+            if (req.getPage() <= 0) req.setPage(1);
+            if (req.getSize() == null || req.getSize() <= 0) req.setSize(20);
+        }
+
+        long totalCount = workReportDao.selectReportCount(req);
+        List<WorkReportRes> list = totalCount > 0
+                ? workReportDao.selectReportList(req)
+                : Collections.emptyList();
+
+        for (WorkReportRes res : list) {
+            enrichReportRes(res);
+        }
+
+        if (isPaged) {
+            return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new PageRes<>(list, totalCount, req.getPage(), req.getSize()));
         } else {
-            for (WorkReportRes res : list) {
-                enrichReportRes(res);
-            }
+            return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(list, (int) totalCount));
         }
-        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(list));
     }
 
     private void enrichReportRes(WorkReportRes res) {
         if (res == null) return;
         SimpleDateFormat dateFmt = new SimpleDateFormat("yyyy-MM-dd");
-        SimpleDateFormat koreanDateFmt = new SimpleDateFormat("yyyy년 M월 D일");
+        SimpleDateFormat koreanDateFmt = new SimpleDateFormat("yyyy년 M월 d일");
         SimpleDateFormat timeFmt = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 
         if (res.getInstallDate() != null && !res.getInstallDate().trim().isEmpty() && res.getInstallDateFormatted() == null) {

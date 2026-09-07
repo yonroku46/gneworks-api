@@ -1,6 +1,8 @@
 package com.gneworks.dao.mapper;
 
 import com.gneworks.dao.entity.User;
+import com.gneworks.dto.req.AdminUserSearchReq;
+import com.gneworks.dto.res.AdminUserRes;
 import jakarta.annotation.Generated;
 import org.apache.ibatis.annotations.Param;
 
@@ -37,4 +39,8 @@ public interface UserMapper {
     int softDeleteUser(@Param("userId") String userId);
 
     int updateLastLogin(@Param("userId") String userId);
+
+    List<AdminUserRes> selectUserListPaged(AdminUserSearchReq req);
+
+    long selectUserCount(AdminUserSearchReq req);
 }
