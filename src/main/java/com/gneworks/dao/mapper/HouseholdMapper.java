@@ -12,7 +12,11 @@ public interface HouseholdMapper {
 
     int insert(Household row);
 
+    int insertBatch(@Param("list") List<Household> list);
+
     Household selectByPrimaryKey(String householdId);
+
+    Household selectBySiteIdAndDongAndHo(@Param("siteId") String siteId, @Param("dong") String dong, @Param("ho") String ho);
 
     List<Household> selectAll();
 

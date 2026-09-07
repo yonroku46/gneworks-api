@@ -23,7 +23,9 @@ import com.gneworks.dto.req.AdminSiteReq;
 import com.gneworks.dto.req.AdminUserReq;
 import com.gneworks.dto.req.AdminUserSearchReq;
 import com.gneworks.dto.res.ActionRes;
+import com.gneworks.dto.res.AdminImportResultRes;
 import com.gneworks.dto.res.AdminInquiryRes;
+import org.springframework.web.multipart.MultipartFile;
 import com.gneworks.dto.res.AdminDashboardSummaryRes;
 import com.gneworks.dto.res.AdminInquirySummaryRes;
 import com.gneworks.dto.res.AdminSiteRes;
@@ -77,6 +79,9 @@ public class AdminService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private ExcelImportService excelImportService;
 
 
     /**
@@ -1111,5 +1116,28 @@ public class AdminService {
         }
 
         return phone.trim();
+    }
+
+    /**
+     * 엑셀 파일 업로드 → site/household 일괄 임포트 (관리자 전용)
+     */
+    public BaseResponse importExcel(String operatorUserId, MultipartFile file, String regionId) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "FORBIDDEN"));
+        }
+        if (file == null || file.isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_FILE", "FILE_REQUIRED"));
+        }
+        String filename = file.getOriginalFilename();
+        if (filename == null || (!filename.endsWith(".xlsx") && !filename.endsWith(".xls"))) {
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_FILE_TYPE", "ONLY_EXCEL_ALLOWED"));
+        }
+        try {
+            AdminImportResultRes result = excelImportService.importExcel(file, regionId);
+            return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, result);
+        } catch (Exception e) {
+            log.error("[importExcel] 엑셀 임포트 실패: {}", e.getMessage(), e);
+            return ResponseUtils.generateDtoFailed(new Information("IMPORT_FAILED", e.getMessage()));
+        }
     }
 }

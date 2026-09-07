@@ -19,6 +19,16 @@
     <result column="reporter_name" property="reporterName" />
     <result column="report_time" property="reportTime" />
   </resultMap>
+  <select id="selectBySiteIdAndDongAndHo" resultMap="BaseResultMap">
+    select household_id, site_id, dong, ho, head_name, target_type, install_status, remarks,
+    create_time
+    from household
+    where site_id = #{siteId,jdbcType=CHAR}
+    and dong = #{dong,jdbcType=VARCHAR}
+    and ho = #{ho,jdbcType=VARCHAR}
+    limit 1
+  </select>
+
   <delete id="deleteByPrimaryKey" parameterType="java.lang.String">
     delete from household
     where household_id = #{householdId,jdbcType=CHAR}
@@ -34,6 +44,17 @@
     values (#{householdId,jdbcType=CHAR}, #{siteId,jdbcType=CHAR}, #{dong,jdbcType=VARCHAR}, 
       #{ho,jdbcType=VARCHAR}, #{headName,jdbcType=VARCHAR}, #{targetType,jdbcType=VARCHAR}, 
       #{installStatus,jdbcType=VARCHAR}, #{remarks,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertBatch" parameterType="java.util.List">
+    insert into household (household_id, site_id, dong, 
+      ho, head_name, target_type, 
+      install_status, remarks, create_time)
+    values 
+    <foreach collection="list" item="item" separator=",">
+      (#{item.householdId,jdbcType=CHAR}, #{item.siteId,jdbcType=CHAR}, #{item.dong,jdbcType=VARCHAR}, 
+      #{item.ho,jdbcType=VARCHAR}, #{item.headName,jdbcType=VARCHAR}, #{item.targetType,jdbcType=VARCHAR}, 
+      #{item.installStatus,jdbcType=VARCHAR}, #{item.remarks,jdbcType=VARCHAR}, #{item.createTime,jdbcType=TIMESTAMP})
+    </foreach>
   </insert>
   <update id="updateByPrimaryKey" parameterType="com.gneworks.dao.entity.Household">
     update household

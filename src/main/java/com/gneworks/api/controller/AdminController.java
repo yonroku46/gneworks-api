@@ -15,6 +15,7 @@ import com.gneworks.dto.res.core.BaseResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
@@ -374,5 +375,20 @@ public class AdminController extends BaseController {
     public BaseResponse getDashboardSummary(
             @RequestParam(value = "regionId", required = false) String regionId) {
         return adminService.getDashboardSummary(getCurrentUserId(), regionId);
+    }
+
+    // ── [7. 엑셀 임포트] ──────────────────────────────────────────
+
+    /**
+     * 엑셀 파일 업로드 → site/household 일괄 임포트 (관리자 전용)
+     * POST /admin/data/import-excel
+     * Content-Type: multipart/form-data
+     * Params: regionId (string), file (xlsx)
+     */
+    @PostMapping("/data/import-excel")
+    public BaseResponse importExcel(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "regionId", required = false) String regionId) {
+        return adminService.importExcel(getCurrentUserId(), file, regionId);
     }
 }

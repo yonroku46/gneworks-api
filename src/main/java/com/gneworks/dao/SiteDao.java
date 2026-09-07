@@ -128,6 +128,21 @@ public class SiteDao {
         }
     }
 
+    public Site selectSiteByNameAndAddress(String name, String address) {
+        try {
+            return siteMapper.selectByNameAndAddress(name, address);
+        } catch (Exception exception) {
+            final String methodName = "SiteMapper#selectByNameAndAddress";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("name", name);
+            paramMap.put("address", address);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
     public int insertSite(Site site) {
         try {
             return siteMapper.insert(site);
@@ -172,6 +187,22 @@ public class SiteDao {
 
     // ── [2. Household] ──────────────────────────────────────
 
+    public Household selectHouseholdBySiteIdAndDongAndHo(String siteId, String dong, String ho) {
+        try {
+            return householdMapper.selectBySiteIdAndDongAndHo(siteId, dong, ho);
+        } catch (Exception exception) {
+            final String methodName = "HouseholdMapper#selectBySiteIdAndDongAndHo";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("siteId", siteId);
+            paramMap.put("dong", dong);
+            paramMap.put("ho", ho);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
     public int insertHousehold(Household household) {
         try {
             return householdMapper.insert(household);
@@ -179,6 +210,21 @@ public class SiteDao {
             final String methodName = "HouseholdMapper#insert";
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("household", household);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public int insertHouseholdBatch(List<Household> households) {
+        if (households == null || households.isEmpty()) return 0;
+        try {
+            return householdMapper.insertBatch(households);
+        } catch (Exception exception) {
+            final String methodName = "HouseholdMapper#insertBatch";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("size", households.size());
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
             log.error(overview + detail);
