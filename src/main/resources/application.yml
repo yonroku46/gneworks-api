@@ -36,3 +36,8 @@ taskexecutor:
   corepoolsize: 4
   queuecapacity: 16
   maxpoolsize: 16
+
+vapid:
+  publicKey: BPVJyjxwClE_gDGyVWPFvs8OFR7QxrDRYg9c6i5bG6HFGNyjvpx3-NXeBTeNkagK7atP8NiVlUoUtglzYvrh38Y
+  privateKey: fq5n1LYvwwUw2pTFauhmMnDT0YmjWyJkPzbV6wNb5GQ
+  subject: mailto:support@gneworks.com

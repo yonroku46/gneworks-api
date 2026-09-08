@@ -36,6 +36,9 @@ public class ContactService {
     @Autowired
     private UserDao userDao;
 
+    @Autowired
+    private AppNotificationService appNotificationService;
+
     @Transactional
     public BaseResponse sendInquiry(String userId, InquiryReq req) {
         ActionRes res = new ActionRes();
@@ -68,6 +71,16 @@ public class ContactService {
         inquiry.setInquiryContents(req.getInquiryContents());
 
         inquiryDao.saveInquiry(inquiry);
+
+        // 관리자 전원에게 실시간 SSE 및 웹 푸시 알림 발송
+        try {
+            String inqType = req.getInquiryType() != null && !req.getInquiryType().isBlank() ? req.getInquiryType() : "업무 문의";
+            String title = "신규 문의 접수";
+            String message = String.format("[%s] 신규 문의사항이 접수되었습니다.", inqType);
+            appNotificationService.sendNotificationToAdmins(title, message, "/manage/inquiries", "LOGO");
+        } catch (Exception e) {
+            log.error("Failed to notify admins of new inquiry: {}", e.getMessage());
+        }
 
         res.setSuccess(Boolean.TRUE);
         res.setId(inquiryId);

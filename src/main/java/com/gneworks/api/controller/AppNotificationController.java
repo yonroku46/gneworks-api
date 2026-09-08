@@ -4,6 +4,7 @@ import com.gneworks.api.controller.base.BaseController;
 import com.gneworks.api.service.AppNotificationService;
 import com.gneworks.api.service.SseService;
 import com.gneworks.aspect.attribute.CheckToken;
+import com.gneworks.dto.req.PushSubscriptionReq;
 import com.gneworks.dto.res.core.BaseResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,5 +50,26 @@ public class AppNotificationController extends BaseController {
     @PatchMapping("/read-all")
     public BaseResponse markAllAsRead() {
         return appNotificationService.markAllAsRead(getCurrentUserId());
+    }
+
+    @GetMapping("/push/vapid-key")
+    public BaseResponse getVapidPublicKey() {
+        return appNotificationService.getVapidPublicKey();
+    }
+
+    @PostMapping("/push/subscribe")
+    public BaseResponse subscribePush(@RequestBody PushSubscriptionReq req) {
+        return appNotificationService.subscribePush(getCurrentUserId(), req);
+    }
+
+    @PostMapping("/push/unsubscribe")
+    public BaseResponse unsubscribePush(@RequestBody PushSubscriptionReq req) {
+        String endpoint = req != null ? req.getEndpoint() : null;
+        return appNotificationService.unsubscribePush(getCurrentUserId(), endpoint);
+    }
+
+    @PostMapping("/push/test")
+    public BaseResponse sendTestNotification() {
+        return appNotificationService.sendTestNotification(getCurrentUserId());
     }
 }

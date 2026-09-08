@@ -83,6 +83,8 @@ public class AdminService {
     @Autowired
     private ExcelImportService excelImportService;
 
+    @Autowired
+    private AppNotificationService appNotificationService;
 
     /**
      * 관리자(ROOT, Roles.ROOT, role_id = 9) 여부 확인
@@ -852,6 +854,18 @@ public class AdminService {
 
         inquiryDao.updateByPrimaryKey(inq);
 
+        // 문의 작성자(작업자)에게 실시간 SSE 및 웹 푸시 알림 발송
+        if (inq.getUserId() != null && !inq.getUserId().trim().isEmpty()) {
+            try {
+                String inqType = inq.getInquiryType() != null && !inq.getInquiryType().trim().isEmpty() ? inq.getInquiryType() : "업무 문의";
+                String title = "문의사항 답변 등록";
+                String message = String.format("[%s] 문의하신 사항에 답변이 등록되었습니다.", inqType);
+                appNotificationService.sendNotificationToUser(inq.getUserId().trim(), title, message, "/portal", "LOGO");
+            } catch (Exception e) {
+                log.error("Failed to notify user of inquiry answer: {}", e.getMessage());
+            }
+        }
+
         ActionRes res = new ActionRes(inquiryId);
         return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
     }
@@ -1062,6 +1076,25 @@ public class AdminService {
                     hh.setInstallStatus("UNINSTALLED");
                 }
                 siteDao.updateHousehold(hh);
+            }
+        }
+
+        // 상태 변경(확인완료 또는 반려) 시 작업자에게 실시간 SSE 및 웹 푸시 알림 발송
+        if (existing.getUserId() != null && !existing.getUserId().trim().isEmpty() && ("COMPLETED".equals(newStatus) || "REJECTED".equals(newStatus))) {
+            try {
+                boolean isApproved = "COMPLETED".equals(newStatus);
+                String title = isApproved ? "작업 보고서 확인완료" : "작업 보고서 반려";
+                String siteName = existing.getSiteName() != null ? existing.getSiteName() : "현장";
+                String statusText = isApproved ? "확인완료(승인)" : "반려";
+                String message = String.format("[%s %s동 %s호] 작업 보고서가 %s되었습니다.%s",
+                        siteName,
+                        existing.getDong() != null ? existing.getDong() : "",
+                        existing.getHo() != null ? existing.getHo() : "",
+                        statusText,
+                        (!isApproved && !fixReason.isEmpty()) ? " (사유: " + fixReason + ")" : "");
+                appNotificationService.sendNotificationToUser(existing.getUserId().trim(), title, message, "/portal", "LOGO");
+            } catch (Exception e) {
+                log.error("Failed to notify worker of report status change: {}", e.getMessage());
             }
         }
 

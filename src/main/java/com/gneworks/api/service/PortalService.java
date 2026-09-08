@@ -79,6 +79,9 @@ public class PortalService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private AppNotificationService appNotificationService;
+
     @Value("${cloud.aws.s3.prefix.user}")
     private String userPrefix;
 
@@ -519,6 +522,17 @@ public class PortalService {
 
             WorkReportRes res = workReportDao.selectReportDetailById(report.getReportId());
             enrichReportRes(res);
+
+            // 신규 보고서 제출 시 관리자 전원에게 실시간 SSE 및 웹 푸시 알림 발송
+            try {
+                String siteName = (res != null && res.getSiteName() != null) ? res.getSiteName() : "현장";
+                String title = "신규 작업 보고서 제출";
+                String message = String.format("[%s] %s동 %s호 보고서가 제출되었습니다.", siteName, report.getDong(), report.getHo());
+                appNotificationService.sendNotificationToAdmins(title, message, "/manage/work", "LOGO");
+            } catch (Exception e) {
+                log.error("Failed to notify admins of new report: {}", e.getMessage());
+            }
+
             return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
         } else {
             // 기존 보고서 수정

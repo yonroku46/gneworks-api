@@ -120,11 +120,12 @@
     select 
       s.site_id, s.region_id, s.name, s.region, s.address, s.sido, s.sigungu, s.eupmyeondong,
       s.contact_phone, s.create_time,
-      count(h.household_id) as total_households,
+      count(distinct h.household_id) as total_households,
       count(distinct h.dong) as dong_count,
-      count(case when h.install_status = 'INSTALLED' then 1 end) as completed_households
+      count(distinct case when wr.status = 'COMPLETED' then h.household_id end) as completed_households
     from site s
     left join household h on s.site_id = h.site_id
+    left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0 and wr.status = 'COMPLETED'
     <where>
       <if test="regionId != null and regionId != '' and regionId != 'ALL'">
         and s.region_id = #{regionId}
@@ -136,7 +137,7 @@
     group by s.site_id
     <choose>
       <when test="orderBy == 'RATE_DESC'">
-        order by (case when count(h.household_id) > 0 then count(case when h.install_status = 'INSTALLED' then 1 end) * 1.0 / count(h.household_id) else 0 end) desc, s.create_time desc
+        order by (case when count(distinct h.household_id) > 0 then count(distinct case when wr.status = 'COMPLETED' then h.household_id end) * 1.0 / count(distinct h.household_id) else 0 end) desc, s.create_time desc
       </when>
       <otherwise>
         order by s.create_time desc
@@ -152,9 +153,9 @@
     select 
       s.site_id, s.region_id, s.name, s.region, s.address, s.sido, s.sigungu, s.eupmyeondong,
       s.contact_phone, s.create_time,
-      count(h.household_id) as total_households,
+      count(distinct h.household_id) as total_households,
       count(distinct h.dong) as dong_count,
-      count(case when h.install_status = 'INSTALLED' then 1 end) as completed_households
+      count(distinct case when wr.status = 'COMPLETED' then h.household_id end) as completed_households
     from (
       select site_id, region_id, name, region, address, sido, sigungu, eupmyeondong, contact_phone, create_time
       from site
@@ -170,6 +171,7 @@
       limit #{size} offset #{offset}
     ) s
     left join household h on s.site_id = h.site_id
+    left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0 and wr.status = 'COMPLETED'
     group by s.site_id
     order by s.create_time desc
   </select>
@@ -209,7 +211,7 @@
       date_format(wr.report_time, '%Y-%m-%d %H:%i') as hh_report_time,
       (select count(*) from household where site_id = s.site_id) as total_households,
       (select count(distinct dong) from household where site_id = s.site_id) as dong_count,
-      (select count(*) from household where site_id = s.site_id and install_status = 'INSTALLED') as completed_households
+      (select count(distinct h_sub.household_id) from household h_sub inner join work_report wr_sub on h_sub.household_id = wr_sub.household_id and wr_sub.delete_flg = 0 and wr_sub.status = 'COMPLETED' where h_sub.site_id = s.site_id) as completed_households
     from site s
     left join household h on s.site_id = h.site_id
     left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0
@@ -221,10 +223,11 @@
   <select id="selectRegionalHouseholdSummary" resultType="map">
     select 
       count(distinct s.site_id) as totalSites,
-      count(h.household_id) as totalTarget,
-      count(case when h.install_status = 'INSTALLED' then 1 end) as completedTarget
+      count(distinct h.household_id) as totalTarget,
+      count(distinct case when wr.status = 'COMPLETED' then h.household_id end) as completedTarget
     from site s
     left join household h on s.site_id = h.site_id
+    left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0 and wr.status = 'COMPLETED'
     <where>
       <if test="regionId != null and regionId != '' and regionId != 'ALL'">
         and s.region_id = #{regionId}

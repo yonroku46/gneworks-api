@@ -43,4 +43,6 @@ public interface UserMapper {
     List<AdminUserRes> selectUserListPaged(AdminUserSearchReq req);
 
     long selectUserCount(AdminUserSearchReq req);
+
+    List<User> selectUsersByRoleId(@Param("roleId") Integer roleId);
 }

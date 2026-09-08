@@ -291,6 +291,7 @@ public class ExcelImportService {
     }
 
     private String mapInstallStatus(String raw) {
-        return "O".equalsIgnoreCase(raw.trim()) ? "INSTALLED" : "UNINSTALLED";
+        // 소방서 보급 대상 명단의 표기와 무관하게 신규 등록 세대는 항상 미설치(UNINSTALLED)로 시작하며 작업 보고서 승인 시 완료로 전환됨
+        return "UNINSTALLED";
     }
 }
