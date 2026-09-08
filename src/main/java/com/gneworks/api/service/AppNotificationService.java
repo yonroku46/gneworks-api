@@ -131,16 +131,21 @@ public class AppNotificationService {
                 messageSource.getMessage(MessageIdConst.I_DELETE_SUCCESS, new String[] { "PushSubscription" }, LocaleAspect.LOCALE)), res);
     }
 
-    @Transactional
     public BaseResponse sendTestNotification(String userId) {
         ActionRes res = new ActionRes();
-        sendNotificationToUser(
-                userId,
-                "테스트 알림",
-                "웹 푸시 알림이 정상적으로 연동되었습니다.",
-                "/portal",
-                "LOGO"
-        );
+        if (userId != null && !userId.isBlank()) {
+            try {
+                List<PushSubscription> subscriptions = pushSubscriptionDao.selectByUserId(userId);
+                if (subscriptions != null && !subscriptions.isEmpty()) {
+                    String payloadJson = createPayloadJson("테스트 알림", "웹 푸시 알림이 정상적으로 연동되었습니다.", "/portal");
+                    for (PushSubscription sub : subscriptions) {
+                        webPushService.sendPushNotification(sub.getEndpoint(), sub.getP256dh(), sub.getAuth(), payloadJson);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Failed to send test WebPush to user {}: {}", userId, e.getMessage(), e);
+            }
+        }
         res.setSuccess(Boolean.TRUE);
         return ResponseUtils.generateDtoSuccess(new Information(MessageIdConst.I_SAVE_SUCCESS, "테스트 알림이 발송되었습니다."), res);
     }
