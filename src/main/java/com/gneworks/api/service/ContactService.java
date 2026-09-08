@@ -14,6 +14,7 @@ import com.gneworks.dto.res.ActionRes;
 import com.gneworks.dto.res.core.BaseResponse;
 import com.gneworks.dto.res.core.Information;
 import com.gneworks.dto.res.ListRes;
+import com.gneworks.common.enums.InquiryType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
@@ -74,7 +75,7 @@ public class ContactService {
 
         // 관리자 전원에게 실시간 SSE 및 웹 푸시 알림 발송
         try {
-            String inqType = req.getInquiryType() != null && !req.getInquiryType().isBlank() ? req.getInquiryType() : "업무 문의";
+            String inqType = InquiryType.toLabel(req.getInquiryType());
             String title = "신규 문의 접수";
             String message = String.format("[%s] 신규 문의사항이 접수되었습니다.", inqType);
             appNotificationService.sendNotificationToAdmins(title, message, "/manage/inquiries", "LOGO");

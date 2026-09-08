@@ -1,6 +1,7 @@
 package com.gneworks.api.service;
 
 import com.gneworks.common.constants.MessageIdConst;
+import com.gneworks.common.enums.InquiryType;
 import com.gneworks.common.enums.Roles;
 import com.gneworks.common.id.KsuidGenerator;
 import com.gneworks.common.utils.ResponseUtils;
@@ -857,7 +858,7 @@ public class AdminService {
         // 문의 작성자(작업자)에게 실시간 SSE 및 웹 푸시 알림 발송
         if (inq.getUserId() != null && !inq.getUserId().trim().isEmpty()) {
             try {
-                String inqType = inq.getInquiryType() != null && !inq.getInquiryType().trim().isEmpty() ? inq.getInquiryType() : "업무 문의";
+                String inqType = InquiryType.toLabel(inq.getInquiryType());
                 String title = "문의사항 답변 등록";
                 String message = String.format("[%s] 문의하신 사항에 답변이 등록되었습니다.", inqType);
                 appNotificationService.sendNotificationToUser(inq.getUserId().trim(), title, message, "/portal", "LOGO");
