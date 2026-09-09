@@ -11,11 +11,7 @@ import com.gneworks.dao.InquiryDao;
 import com.gneworks.dao.SiteDao;
 import com.gneworks.dao.UserDao;
 import com.gneworks.dao.WorkReportDao;
-import com.gneworks.dao.entity.FireRegion;
-import com.gneworks.dao.entity.Household;
-import com.gneworks.dao.entity.Inquiry;
-import com.gneworks.dao.entity.User;
-import com.gneworks.dao.entity.UserAssignedRegion;
+import com.gneworks.dao.entity.*;
 import com.gneworks.dto.res.ActionRes;
 import com.gneworks.dto.res.AdminDashboardSummaryRes;
 import com.gneworks.dto.res.AdminSiteRes;
@@ -36,7 +32,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.gneworks.dao.entity.WorkReport;
 import com.gneworks.dto.req.AdminReportSearchReq;
 import com.gneworks.dto.req.WorkReportReq;
 import com.gneworks.dto.res.WorkReportRes;
@@ -525,10 +520,25 @@ public class PortalService {
 
             // 신규 보고서 제출 시 관리자 전원에게 실시간 SSE 및 웹 푸시 알림 발송
             try {
-                String siteName = (res != null && res.getSiteName() != null) ? res.getSiteName() : "현장";
+                String siteName = (res != null && res.getSiteName() != null) ? res.getSiteName().trim() : "현장";
+                String sido = (res != null && res.getSido() != null) ? res.getSido().trim() : "";
+                String sigungu = (res != null && res.getSigungu() != null) ? res.getSigungu().trim() : "";
+
+                String regionPart = "";
+                if (!sido.isEmpty() && !sigungu.isEmpty()) {
+                    regionPart = sido + " " + sigungu;
+                } else if (!sido.isEmpty()) {
+                    regionPart = sido;
+                } else if (!sigungu.isEmpty()) {
+                    regionPart = sigungu;
+                }
+
+                String locationPrefix = regionPart.isEmpty() ? siteName : regionPart + " · " + siteName;
                 String title = "신규 작업 보고서 제출";
-                String message = String.format("[%s] %s동 %s호 보고서가 제출되었습니다.", siteName, report.getDong(), report.getHo());
-                appNotificationService.sendNotificationToAdmins(title, message, "/manage/work", "LOGO");
+                String message = String.format("[%s] %s동 %s호 보고서가 제출되었습니다.", locationPrefix, report.getDong(), report.getHo());
+                String targetUrl = "/manage/work?reportId=" + report.getReportId();
+
+                appNotificationService.sendNotificationToAdmins(title, message, targetUrl, "LOGO");
             } catch (Exception e) {
                 log.error("Failed to notify admins of new report: {}", e.getMessage());
             }

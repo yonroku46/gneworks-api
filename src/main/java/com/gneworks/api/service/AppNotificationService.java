@@ -158,11 +158,15 @@ public class AppNotificationService {
         if (userId == null || userId.isBlank()) return;
 
         // 1. DB 알림 테이블 저장
+        String storedMessage = (url != null && !url.trim().isEmpty())
+                ? message + "\n<!--link:" + url.trim() + "-->"
+                : message;
+
         AppNotification notification = new AppNotification();
         notification.setAppNotificationId(KsuidGenerator.createId());
         notification.setUserId(userId);
         notification.setTitle(title);
-        notification.setMessage(message);
+        notification.setMessage(storedMessage);
         notification.setIconType(iconType != null ? iconType : "LOGO");
         notification.setIsRead(Boolean.FALSE);
         notification.setCreateTime(new Date());
@@ -203,12 +207,16 @@ public class AppNotificationService {
         try {
             List<User> admins = userDao.selectUsersByRoleId(Roles.ROOT.getValue());
             if (admins != null && !admins.isEmpty()) {
+                String storedMessage = (url != null && !url.trim().isEmpty())
+                        ? message + "\n<!--link:" + url.trim() + "-->"
+                        : message;
+
                 for (User admin : admins) {
                     AppNotification notification = new AppNotification();
                     notification.setAppNotificationId(KsuidGenerator.createId());
                     notification.setUserId(admin.getUserId());
                     notification.setTitle(title);
-                    notification.setMessage(message);
+                    notification.setMessage(storedMessage);
                     notification.setIconType(iconType != null ? iconType : "LOGO");
                     notification.setIsRead(Boolean.FALSE);
                     notification.setCreateTime(new Date());
