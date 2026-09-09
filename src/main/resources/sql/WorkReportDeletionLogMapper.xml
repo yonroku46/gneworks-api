@@ -147,13 +147,13 @@
     fix_reason, delete_reason
     from work_report_deletion_log
     <where>
-      <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+      <if test="regionId != null and regionId != ''">
         and region_id = #{regionId}
       </if>
-      <if test="sido != null and sido != '' and sido != 'ALL'">
+      <if test="sido != null and sido != ''">
         and sido = #{sido}
       </if>
-      <if test="sigungu != null and sigungu != '' and sigungu != 'ALL'">
+      <if test="sigungu != null and sigungu != ''">
         and sigungu = #{sigungu}
       </if>
       <if test="startDate != null and startDate != ''">
@@ -184,13 +184,13 @@
     select count(*)
     from work_report_deletion_log
     <where>
-      <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+      <if test="regionId != null and regionId != ''">
         and region_id = #{regionId}
       </if>
-      <if test="sido != null and sido != '' and sido != 'ALL'">
+      <if test="sido != null and sido != ''">
         and sido = #{sido}
       </if>
-      <if test="sigungu != null and sigungu != '' and sigungu != 'ALL'">
+      <if test="sigungu != null and sigungu != ''">
         and sigungu = #{sigungu}
       </if>
       <if test="startDate != null and startDate != ''">

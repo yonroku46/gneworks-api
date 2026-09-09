@@ -98,7 +98,7 @@
     left join fire_region all_fr on all_uar.region_id = all_fr.region_id
     where u.delete_flg = 0
       and u.role_id = 1
-      <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+      <if test="regionId != null and regionId != ''">
         and target_uar.region_id = #{regionId}
       </if>
     order by u.last_update desc, all_uar.create_time asc

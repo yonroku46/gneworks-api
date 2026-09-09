@@ -189,7 +189,7 @@
     from work_report wr
     left join site s on wr.site_id = s.site_id
     where wr.delete_flg = 0
-    <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+    <if test="regionId != null and regionId != ''">
       and s.region_id = #{regionId}
     </if>
     <if test="status != null and status != '' and status != 'ALL'">
@@ -262,7 +262,7 @@
     from work_report wr
     left join site s on wr.site_id = s.site_id
     where wr.delete_flg = 0
-    <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+    <if test="regionId != null and regionId != ''">
       and s.region_id = #{regionId}
     </if>
     <if test="status != null and status != '' and status != 'ALL'">
@@ -330,7 +330,7 @@
       inner join user_assigned_region uar on u.user_id = uar.user_id
       inner join fire_region fr on uar.region_id = fr.region_id
       where u.delete_flg = 0 and u.role_id = 1
-        <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+        <if test="regionId != null and regionId != ''">
           and fr.region_id = #{regionId}
         </if>
       union
@@ -339,7 +339,7 @@
       inner join work_report wr on u.user_id = wr.user_id and wr.delete_flg = 0
       inner join site s on wr.site_id = s.site_id
       where u.delete_flg = 0 and u.role_id = 1
-        <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+        <if test="regionId != null and regionId != ''">
           and s.region_id = #{regionId}
         </if>
     ) t
@@ -348,7 +348,7 @@
       from work_report wr_inner
       left join site s_inner on wr_inner.site_id = s_inner.site_id
       where wr_inner.delete_flg = 0
-        <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+        <if test="regionId != null and regionId != ''">
           and s_inner.region_id = #{regionId}
         </if>
     ) wr on t.user_id = wr.user_id
@@ -368,7 +368,7 @@
       inner join user_assigned_region uar on u.user_id = uar.user_id
       inner join fire_region fr on uar.region_id = fr.region_id
       where u.delete_flg = 0 and u.role_id = 1
-        <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+        <if test="regionId != null and regionId != ''">
           and fr.region_id = #{regionId}
         </if>
       union
@@ -377,7 +377,7 @@
       inner join work_report wr on u.user_id = wr.user_id and wr.delete_flg = 0
       inner join site s on wr.site_id = s.site_id
       where u.delete_flg = 0 and u.role_id = 1
-        <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+        <if test="regionId != null and regionId != ''">
           and s.region_id = #{regionId}
         </if>
     ) t
@@ -395,7 +395,7 @@
     from work_report wr
     left join site s on wr.site_id = s.site_id
     where wr.delete_flg = 0
-    <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+    <if test="regionId != null and regionId != ''">
       and s.region_id = #{regionId}
     </if>
   </select>

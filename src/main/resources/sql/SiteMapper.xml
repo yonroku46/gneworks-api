@@ -127,7 +127,7 @@
     left join household h on s.site_id = h.site_id
     left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0 and wr.status = 'COMPLETED'
     <where>
-      <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+      <if test="regionId != null and regionId != ''">
         and s.region_id = #{regionId}
       </if>
       <if test="query != null and query != ''">
@@ -160,7 +160,7 @@
       select site_id, region_id, name, region, address, sido, sigungu, eupmyeondong, contact_phone, create_time
       from site
       <where>
-        <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+        <if test="regionId != null and regionId != ''">
           and region_id = #{regionId}
         </if>
         <if test="query != null and query != ''">
@@ -181,7 +181,7 @@
     select count(*)
     from site
     <where>
-      <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+      <if test="regionId != null and regionId != ''">
         and region_id = #{regionId}
       </if>
       <if test="query != null and query != ''">
@@ -229,7 +229,7 @@
     left join household h on s.site_id = h.site_id
     left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0 and wr.status = 'COMPLETED'
     <where>
-      <if test="regionId != null and regionId != '' and regionId != 'ALL'">
+      <if test="regionId != null and regionId != ''">
         and s.region_id = #{regionId}
       </if>
     </where>
