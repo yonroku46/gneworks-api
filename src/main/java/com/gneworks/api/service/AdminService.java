@@ -26,6 +26,12 @@ import com.gneworks.dto.req.AdminUserSearchReq;
 import com.gneworks.dto.res.ActionRes;
 import com.gneworks.dto.res.AdminImportResultRes;
 import com.gneworks.dto.res.AdminInquiryRes;
+import com.gneworks.dao.WorkReportDeletionLogDao;
+import com.gneworks.dao.entity.WorkReportDeletionLog;
+import com.gneworks.dto.req.AdminDeleteReportReq;
+import com.gneworks.dto.req.AdminDeletionLogSearchReq;
+import com.amazonaws.services.s3.AmazonS3;
+import com.gneworks.common.utils.S3Utils;
 import org.springframework.web.multipart.MultipartFile;
 import com.gneworks.dto.res.AdminDashboardSummaryRes;
 import com.gneworks.dto.res.AdminInquirySummaryRes;
@@ -63,6 +69,7 @@ public class AdminService {
 
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
     private static final SimpleDateFormat DATETIME_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    private static final SimpleDateFormat DATETIME_MINUTE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm");
     private static final SimpleDateFormat BIRTH_PW_FORMAT = new SimpleDateFormat("yyMMdd");
     private static final Information INFO_SUCCESS = new Information("SUCCESS", "SUCCESS");
 
@@ -77,6 +84,12 @@ public class AdminService {
 
     @Autowired
     private WorkReportDao workReportDao;
+
+    @Autowired
+    private WorkReportDeletionLogDao workReportDeletionLogDao;
+
+    @Autowired(required = false)
+    private AmazonS3 amazonS3;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -1101,6 +1114,169 @@ public class AdminService {
 
         ActionRes res = new ActionRes(reportId);
         return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
+    }
+
+    /**
+     * 시공 보고서 영구 삭제 (스냅샷 감사 로그 저장 + S3 사진 삭제 + 세대 상태 복원)
+     */
+    @Transactional
+    public BaseResponse deleteWorkReport(String operatorUserId, String reportId, AdminDeleteReportReq req) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
+        }
+        if (reportId == null || reportId.trim().isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_PARAMETER", "REPORT_ID_REQUIRED"));
+        }
+        if (req == null || req.getDeleteReason() == null || req.getDeleteReason().trim().isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("DELETE_REASON_REQUIRED", "삭제 사유를 입력해 주세요."));
+        }
+
+        WorkReportRes existing = workReportDao.selectReportDetailById(reportId.trim());
+        if (existing == null) {
+            return ResponseUtils.generateDtoFailed(new Information("NOT_FOUND", "REPORT_NOT_FOUND"));
+        }
+
+        // 1. 삭제 실행 관리자 성명 조회
+        User operator = userDao.findUser(operatorUserId.trim());
+        String operatorName = (operator != null && operator.getUserName() != null) ? operator.getUserName() : "관리자";
+
+        // 2. 현장 메타 정보 상세 조회 (regionId, sido, sigungu, eupmyeondong, address 등)
+        String siteName = existing.getSiteName() != null ? existing.getSiteName() : "";
+        String regionId = null;
+        String sido = existing.getSido();
+        String sigungu = existing.getSigungu();
+        String eupmyeondong = existing.getEupmyeondong();
+        String address = existing.getAddress();
+
+        if (existing.getSiteId() != null && !existing.getSiteId().trim().isEmpty()) {
+            Site site = siteDao.selectSiteById(existing.getSiteId().trim());
+            if (site != null) {
+                if (site.getName() != null && !site.getName().trim().isEmpty()) siteName = site.getName();
+                if (site.getRegionId() != null) regionId = site.getRegionId();
+                if (site.getSido() != null) sido = site.getSido();
+                if (site.getSigungu() != null) sigungu = site.getSigungu();
+                if (site.getEupmyeondong() != null) eupmyeondong = site.getEupmyeondong();
+                if (site.getAddress() != null) address = site.getAddress();
+            }
+        }
+
+        // 3. 날짜 파싱 (installDate, reportTime)
+        Date installDate = null;
+        if (existing.getInstallDate() != null && !existing.getInstallDate().trim().isEmpty()) {
+            try {
+                installDate = DATE_FORMAT.parse(existing.getInstallDate().trim());
+            } catch (Exception ignored) {}
+        }
+
+        Date reportTime = null;
+        if (existing.getReportTime() != null && !existing.getReportTime().trim().isEmpty()) {
+            try {
+                reportTime = DATETIME_MINUTE_FORMAT.parse(existing.getReportTime().trim());
+            } catch (Exception e1) {
+                try {
+                    reportTime = DATETIME_FORMAT.parse(existing.getReportTime().trim());
+                } catch (Exception ignored) {}
+            }
+        }
+
+        // 4. 세대 상태 복원 (UNINSTALLED)
+        if (existing.getHouseholdId() != null && !existing.getHouseholdId().trim().isEmpty()) {
+            Household hh = siteDao.selectHouseholdById(existing.getHouseholdId().trim());
+            if (hh != null) {
+                hh.setInstallStatus("UNINSTALLED");
+                siteDao.updateHousehold(hh);
+            }
+        }
+
+        // 5. 삭제 로그(스냅샷) 영구 보존용 엔티티 생성 및 insert
+        WorkReportDeletionLog logRecord = new WorkReportDeletionLog();
+        logRecord.setLogId(KsuidGenerator.createId());
+        logRecord.setReportId(existing.getReportId());
+        logRecord.setHouseholdId(existing.getHouseholdId());
+        logRecord.setSiteId(existing.getSiteId());
+        logRecord.setUserId(existing.getUserId());
+        logRecord.setDong(existing.getDong());
+        logRecord.setHo(existing.getHo());
+        logRecord.setHeadName(existing.getHeadName());
+        logRecord.setInstallDate(installDate);
+        logRecord.setReportTime(reportTime);
+        logRecord.setReporterName(existing.getReporterName());
+        logRecord.setConfirmerName(existing.getConfirmerName());
+        logRecord.setConfirmerSignature(existing.getConfirmerSignature());
+        logRecord.setPhotoDoor(existing.getPhotoDoor());
+        logRecord.setPhotoBefore1(existing.getPhotoBefore1());
+        logRecord.setPhotoAfter1(existing.getPhotoAfter1());
+        logRecord.setPhotoBefore2(existing.getPhotoBefore2());
+        logRecord.setPhotoAfter2(existing.getPhotoAfter2());
+        logRecord.setStatus(existing.getStatus());
+        logRecord.setRemarks(existing.getRemarks());
+        logRecord.setFixReason(existing.getFixReason());
+        logRecord.setCreateTime(existing.getCreateTime());
+        logRecord.setSiteName(siteName);
+        logRecord.setRegionId(regionId);
+        logRecord.setSido(sido);
+        logRecord.setSigungu(sigungu);
+        logRecord.setEupmyeondong(eupmyeondong);
+        logRecord.setAddress(address);
+        logRecord.setDeleteReason(req.getDeleteReason().trim());
+        logRecord.setDeletedBy(operatorUserId.trim());
+        logRecord.setDeletedByName(operatorName);
+        logRecord.setDeletedTime(new Date());
+
+        workReportDeletionLogDao.insert(logRecord);
+
+        // 6. S3 사진 파일들 안전 삭제
+        deleteS3PhotoSafely(existing.getPhotoDoor());
+        deleteS3PhotoSafely(existing.getPhotoBefore1());
+        deleteS3PhotoSafely(existing.getPhotoAfter1());
+        deleteS3PhotoSafely(existing.getPhotoBefore2());
+        deleteS3PhotoSafely(existing.getPhotoAfter2());
+        deleteS3PhotoSafely(existing.getConfirmerSignature());
+
+        // 7. 원본 보고서 테이블에서 물리 삭제
+        workReportDao.deleteByPrimaryKey(reportId.trim());
+
+        log.info("Work report deleted successfully. reportId={}, operator={}({}), reason={}",
+                reportId, operatorName, operatorUserId, req.getDeleteReason().trim());
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ActionRes(reportId));
+    }
+
+    private void deleteS3PhotoSafely(String photoPath) {
+        if (photoPath == null || photoPath.trim().isEmpty() || amazonS3 == null) {
+            return;
+        }
+        String path = photoPath.trim();
+        // data:image 또는 .svg 파일(기본 템플릿 서명 등)은 삭제 대상 제외
+        if (path.startsWith("data:") || path.toLowerCase().endsWith(".svg")) {
+            return;
+        }
+        try {
+            String s3Key = path.startsWith("/") ? path.substring(1) : path;
+            S3Utils.deleteFile(s3Key, amazonS3);
+        } catch (Exception ex) {
+            log.warn("Failed to delete report image from S3: {}", photoPath, ex);
+        }
+    }
+
+    /**
+     * 시공 보고서 삭제 이력 페이징 조회
+     */
+    @Transactional(readOnly = true)
+    public BaseResponse getDeletionLogs(String operatorUserId, AdminDeletionLogSearchReq req) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
+        }
+        if (req == null) req = new AdminDeletionLogSearchReq();
+        if (req.getPage() == null || req.getPage() <= 0) req.setPage(1);
+        if (req.getSize() == null || req.getSize() <= 0) req.setSize(30);
+
+        long totalCount = workReportDeletionLogDao.selectDeletionLogsCount(req);
+        List<WorkReportDeletionLog> list = totalCount > 0
+                ? workReportDeletionLogDao.selectDeletionLogs(req)
+                : Collections.emptyList();
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new PageRes<>(list, totalCount, req.getPage(), req.getSize()));
     }
 
     private void enrichReportRes(WorkReportRes res) {

@@ -211,4 +211,18 @@ public class WorkReportDao {
             throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
         }
     }
+
+    public int deleteByPrimaryKey(String reportId) {
+        try {
+            return workReportMapper.deleteByPrimaryKey(reportId);
+        } catch (Exception exception) {
+            final String methodName = "WorkReportMapper#deleteByPrimaryKey";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("reportId", reportId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
 }

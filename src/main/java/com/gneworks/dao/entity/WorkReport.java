@@ -8,28 +8,28 @@ import java.util.Date;
 public class WorkReport {
     /**
      * Column: report_id
-     * Type: CHAR(32)
+     * Type: CHAR(27)
      * Remark: 보고서 고유 키
      */
     private String reportId;
 
     /**
      * Column: household_id
-     * Type: CHAR(32)
+     * Type: CHAR(27)
      * Remark: 세대 고유 키
      */
     private String householdId;
 
     /**
      * Column: site_id
-     * Type: CHAR(32)
+     * Type: CHAR(27)
      * Remark: 현장 고유 키
      */
     private String siteId;
 
     /**
      * Column: user_id
-     * Type: CHAR(32)
+     * Type: CHAR(27)
      * Remark: 작성 작업자 고유 키
      */
     private String userId;

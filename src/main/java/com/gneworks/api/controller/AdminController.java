@@ -3,6 +3,8 @@ package com.gneworks.api.controller;
 import com.gneworks.api.controller.base.BaseController;
 import com.gneworks.api.service.AdminService;
 import com.gneworks.aspect.attribute.CheckToken;
+import com.gneworks.dto.req.AdminDeleteReportReq;
+import com.gneworks.dto.req.AdminDeletionLogSearchReq;
 import com.gneworks.dto.req.AdminHouseholdReq;
 import com.gneworks.dto.req.AdminInquiryAnswerReq;
 import com.gneworks.dto.req.AdminInquirySearchReq;
@@ -12,6 +14,7 @@ import com.gneworks.dto.req.AdminSiteReq;
 import com.gneworks.dto.req.AdminUserReq;
 import com.gneworks.dto.req.AdminUserSearchReq;
 import com.gneworks.dto.res.core.BaseResponse;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -337,6 +340,15 @@ public class AdminController extends BaseController {
     }
 
     /**
+     * 시공 보고서 삭제 이력 페이징 조회
+     * GET /admin/report/deleted
+     */
+    @GetMapping("/report/deleted")
+    public BaseResponse getDeletedReportListPaged(AdminDeletionLogSearchReq req) {
+        return adminService.getDeletionLogs(getCurrentUserId(), req);
+    }
+
+    /**
      * 시공 보고서 단건 상세 조회
      * GET /admin/report/{reportId}
      */
@@ -352,6 +364,15 @@ public class AdminController extends BaseController {
     @PutMapping("/report/{reportId}/status")
     public BaseResponse updateReportStatus(@PathVariable("reportId") String reportId, @RequestBody AdminReportStatusReq req) {
         return adminService.updateReportStatus(getCurrentUserId(), reportId, req);
+    }
+
+    /**
+     * 시공 보고서 영구 삭제 (관리자 필수 사유 기록 및 S3 사진 삭제, 세대 상태 원복)
+     * DELETE /admin/report/{reportId}
+     */
+    @DeleteMapping("/report/{reportId}")
+    public BaseResponse deleteReport(@PathVariable("reportId") String reportId, @Valid @RequestBody AdminDeleteReportReq req) {
+        return adminService.deleteWorkReport(getCurrentUserId(), reportId, req);
     }
 
     // ── [6. 대시보드 전용 최적화 API] ──────────────────────────────────────────
