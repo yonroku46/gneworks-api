@@ -9,6 +9,7 @@ import com.gneworks.common.utils.S3Utils;
 import com.gneworks.common.utils.StringUtils;
 import com.gneworks.dao.InquiryDao;
 import com.gneworks.dao.SiteDao;
+import com.gneworks.dao.SystemSettingsDao;
 import com.gneworks.dao.UserDao;
 import com.gneworks.dao.WorkReportDao;
 import com.gneworks.dao.entity.*;
@@ -18,6 +19,7 @@ import com.gneworks.dto.res.AdminSiteRes;
 import com.gneworks.dto.res.HouseholdRes;
 import com.gneworks.dto.res.ListRes;
 import com.gneworks.dto.res.PageRes;
+import com.gneworks.dto.res.PortalNoticeRes;
 import com.gneworks.dto.res.UserAssignedRegionDetailRes;
 import java.util.Collections;
 import com.gneworks.dto.res.UserRes;
@@ -76,6 +78,9 @@ public class PortalService {
 
     @Autowired
     private AppNotificationService appNotificationService;
+
+    @Autowired
+    private SystemSettingsDao systemSettingsDao;
 
     @Value("${cloud.aws.s3.prefix.user}")
     private String userPrefix;
@@ -689,5 +694,30 @@ public class PortalService {
                 new Information(MessageIdConst.I_GETTING_SUCCESS,
                         messageSource.getMessage(MessageIdConst.I_GETTING_SUCCESS, new String[] { "Inquiry" }, LocaleAspect.LOCALE)),
                 new ListRes<>(list != null ? list : new ArrayList<>()));
+    }
+
+    // ── [5. 현장 안내사항(공지)] ────────────────────────────
+
+    /**
+     * 현장 안내사항(공지) 및 비상 연락처 조회
+     * GET /portal/notice
+     */
+    @Transactional(readOnly = true)
+    public BaseResponse getNotice() {
+        SystemSettings setting = systemSettingsDao.selectByPrimaryKey((byte) 1);
+        if (setting == null) {
+            return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, null);
+        }
+
+        PortalNoticeRes res = PortalNoticeRes.builder()
+                .noticeVisible(setting.getNoticeVisible() != null ? setting.getNoticeVisible() : Boolean.TRUE)
+                .noticeTitle(setting.getNoticeTitle())
+                .noticeContent(setting.getNoticeContent())
+                .noticeDate(setting.getNoticeDate())
+                .contactPhone(setting.getContactPhone())
+                .contactEmail(setting.getContactEmail())
+                .build();
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
     }
 }

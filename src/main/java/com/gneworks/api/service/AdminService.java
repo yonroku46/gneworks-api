@@ -28,8 +28,12 @@ import com.gneworks.dto.res.AdminImportResultRes;
 import com.gneworks.dto.res.AdminInquiryRes;
 import com.gneworks.dao.WorkReportDeletionLogDao;
 import com.gneworks.dao.entity.WorkReportDeletionLog;
+import com.gneworks.dao.SystemSettingsDao;
+import com.gneworks.dao.entity.SystemSettings;
 import com.gneworks.dto.req.AdminDeleteReportReq;
 import com.gneworks.dto.req.AdminDeletionLogSearchReq;
+import com.gneworks.dto.req.SystemSettingsReq;
+import com.gneworks.dto.res.SystemSettingsRes;
 import com.amazonaws.services.s3.AmazonS3;
 import com.gneworks.common.utils.S3Utils;
 import org.springframework.web.multipart.MultipartFile;
@@ -99,6 +103,9 @@ public class AdminService {
 
     @Autowired
     private AppNotificationService appNotificationService;
+
+    @Autowired
+    private SystemSettingsDao systemSettingsDao;
 
     /**
      * 관리자(ROOT, Roles.ROOT, role_id = 9) 여부 확인
@@ -1349,5 +1356,66 @@ public class AdminService {
             log.error("[importExcel] 엑셀 임포트 실패: {}", e.getMessage(), e);
             return ResponseUtils.generateDtoFailed(new Information("IMPORT_FAILED", e.getMessage()));
         }
+    }
+
+    // ── [8. 시스템 전역 설정] ──────────────────────────────────────────
+
+    /**
+     * 시스템 설정 조회
+     * GET /admin/settings
+     */
+    @Transactional(readOnly = true)
+    public BaseResponse getSettings(String operatorUserId) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "FORBIDDEN"));
+        }
+
+        SystemSettings setting = systemSettingsDao.selectByPrimaryKey((byte) 1);
+        if (setting == null) {
+            return ResponseUtils.generateDtoFailed(new Information("SETTINGS_NOT_FOUND", "시스템 설정 정보가 존재하지 않습니다."));
+        }
+
+        SystemSettingsRes res = SystemSettingsRes.builder()
+                .settingId(setting.getSettingId())
+                .contactPhone(setting.getContactPhone())
+                .contactEmail(setting.getContactEmail())
+                .noticeVisible(setting.getNoticeVisible())
+                .noticeTitle(setting.getNoticeTitle())
+                .noticeContent(setting.getNoticeContent())
+                .noticeDate(setting.getNoticeDate())
+                .build();
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
+    }
+
+    /**
+     * 시스템 설정 수정
+     * PUT /admin/settings
+     */
+    @Transactional
+    public BaseResponse updateSettings(String operatorUserId, SystemSettingsReq req) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "FORBIDDEN"));
+        }
+
+        SystemSettings setting = systemSettingsDao.selectByPrimaryKey((byte) 1);
+        if (setting == null) {
+            return ResponseUtils.generateDtoFailed(new Information("SETTINGS_NOT_FOUND", "수정할 시스템 설정 정보가 존재하지 않습니다."));
+        }
+
+        if (req != null) {
+            if (req.getContactPhone() != null) setting.setContactPhone(req.getContactPhone());
+            if (req.getContactEmail() != null) setting.setContactEmail(req.getContactEmail());
+            if (req.getNoticeVisible() != null) setting.setNoticeVisible(req.getNoticeVisible());
+            if (req.getNoticeTitle() != null) setting.setNoticeTitle(req.getNoticeTitle());
+            if (req.getNoticeContent() != null) setting.setNoticeContent(req.getNoticeContent());
+            if (req.getNoticeDate() != null) setting.setNoticeDate(req.getNoticeDate());
+        }
+        setting.setUpdateTime(new Date());
+        systemSettingsDao.updateByPrimaryKey(setting);
+
+        ActionRes res = new ActionRes();
+        res.setSuccess(Boolean.TRUE);
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
     }
 }

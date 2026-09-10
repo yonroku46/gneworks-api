@@ -5,6 +5,7 @@ import com.gneworks.api.service.AppNotificationService;
 import com.gneworks.api.service.SseService;
 import com.gneworks.aspect.attribute.CheckToken;
 import com.gneworks.dto.req.PushSubscriptionReq;
+import com.gneworks.dto.req.UserNotificationSettingReq;
 import com.gneworks.dto.res.core.BaseResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,5 +72,15 @@ public class AppNotificationController extends BaseController {
     @PostMapping("/push/test")
     public BaseResponse sendTestNotification() {
         return appNotificationService.sendTestNotification(getCurrentUserId());
+    }
+
+    @GetMapping("/settings")
+    public BaseResponse getUserNotificationSettings() {
+        return appNotificationService.getUserNotificationSettings(getCurrentUserId());
+    }
+
+    @PutMapping("/settings")
+    public BaseResponse updateUserNotificationSettings(@RequestBody UserNotificationSettingReq req) {
+        return appNotificationService.updateUserNotificationSettings(getCurrentUserId(), req);
     }
 }

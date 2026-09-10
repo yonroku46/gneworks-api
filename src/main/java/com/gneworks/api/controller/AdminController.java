@@ -13,6 +13,7 @@ import com.gneworks.dto.req.AdminReportStatusReq;
 import com.gneworks.dto.req.AdminSiteReq;
 import com.gneworks.dto.req.AdminUserReq;
 import com.gneworks.dto.req.AdminUserSearchReq;
+import com.gneworks.dto.req.SystemSettingsReq;
 import com.gneworks.dto.res.core.BaseResponse;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -411,5 +412,25 @@ public class AdminController extends BaseController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "regionId", required = false) String regionId) {
         return adminService.importExcel(getCurrentUserId(), file, regionId);
+    }
+
+    // ── [8. 시스템 전역 설정] ──────────────────────────────────────────
+
+    /**
+     * 시스템 설정 조회
+     * GET /admin/settings
+     */
+    @GetMapping("/settings")
+    public BaseResponse getSettings() {
+        return adminService.getSettings(getCurrentUserId());
+    }
+
+    /**
+     * 시스템 설정 수정
+     * PUT /admin/settings
+     */
+    @PutMapping("/settings")
+    public BaseResponse updateSettings(@RequestBody SystemSettingsReq req) {
+        return adminService.updateSettings(getCurrentUserId(), req);
     }
 }

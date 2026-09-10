@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gneworks.dao.mapper.SystemSettingsMapper">
+  <resultMap id="BaseResultMap" type="com.gneworks.dao.entity.SystemSettings">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    <id column="setting_id" jdbcType="TINYINT" property="settingId" />
+    <result column="contact_phone" jdbcType="VARCHAR" property="contactPhone" />
+    <result column="contact_email" jdbcType="VARCHAR" property="contactEmail" />
+    <result column="notice_visible" jdbcType="BIT" property="noticeVisible" />
+    <result column="notice_title" jdbcType="VARCHAR" property="noticeTitle" />
+    <result column="notice_date" jdbcType="VARCHAR" property="noticeDate" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="notice_content" jdbcType="LONGVARCHAR" property="noticeContent" />
+  </resultMap>
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Byte">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    delete from system_settings
+    where setting_id = #{settingId,jdbcType=TINYINT}
+  </delete>
+  <insert id="insert" parameterType="com.gneworks.dao.entity.SystemSettings">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    insert into system_settings (setting_id, contact_phone, contact_email, 
+      notice_visible, notice_title, notice_date, 
+      update_time, notice_content)
+    values (#{settingId,jdbcType=TINYINT}, #{contactPhone,jdbcType=VARCHAR}, #{contactEmail,jdbcType=VARCHAR}, 
+      #{noticeVisible,jdbcType=BIT}, #{noticeTitle,jdbcType=VARCHAR}, #{noticeDate,jdbcType=VARCHAR}, 
+      #{updateTime,jdbcType=TIMESTAMP}, #{noticeContent,jdbcType=LONGVARCHAR})
+  </insert>
+  <update id="updateByPrimaryKey" parameterType="com.gneworks.dao.entity.SystemSettings">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    update system_settings
+    set contact_phone = #{contactPhone,jdbcType=VARCHAR},
+      contact_email = #{contactEmail,jdbcType=VARCHAR},
+      notice_visible = #{noticeVisible,jdbcType=BIT},
+      notice_title = #{noticeTitle,jdbcType=VARCHAR},
+      notice_date = #{noticeDate,jdbcType=VARCHAR},
+      update_time = #{updateTime,jdbcType=TIMESTAMP},
+      notice_content = #{noticeContent,jdbcType=LONGVARCHAR}
+    where setting_id = #{settingId,jdbcType=TINYINT}
+  </update>
+  <select id="selectByPrimaryKey" parameterType="java.lang.Byte" resultMap="BaseResultMap">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    select setting_id, contact_phone, contact_email, notice_visible, notice_title, notice_date, 
+    update_time, notice_content
+    from system_settings
+    where setting_id = #{settingId,jdbcType=TINYINT}
+  </select>
+  <select id="selectAll" resultMap="BaseResultMap">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    select setting_id, contact_phone, contact_email, notice_visible, notice_title, notice_date, 
+    update_time, notice_content
+    from system_settings
+  </select>
+</mapper>

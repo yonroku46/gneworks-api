@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gneworks.dao.mapper.UserNotificationSettingMapper">
+  <resultMap id="BaseResultMap" type="com.gneworks.dao.entity.UserNotificationSetting">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    <id column="user_id" jdbcType="CHAR" property="userId" />
+    <result column="notify_web_push" jdbcType="BIT" property="notifyWebPush" />
+    <result column="notify_new_report" jdbcType="BIT" property="notifyNewReport" />
+    <result column="notify_new_inquiry" jdbcType="BIT" property="notifyNewInquiry" />
+    <result column="notify_report_status" jdbcType="BIT" property="notifyReportStatus" />
+    <result column="notify_inquiry_answer" jdbcType="BIT" property="notifyInquiryAnswer" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+  </resultMap>
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.String">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    delete from user_notification_setting
+    where user_id = #{userId,jdbcType=CHAR}
+  </delete>
+  <insert id="insert" parameterType="com.gneworks.dao.entity.UserNotificationSetting">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    insert into user_notification_setting (user_id, notify_web_push, notify_new_report, 
+      notify_new_inquiry, notify_report_status, notify_inquiry_answer, 
+      update_time)
+    values (#{userId,jdbcType=CHAR}, #{notifyWebPush,jdbcType=BIT}, #{notifyNewReport,jdbcType=BIT}, 
+      #{notifyNewInquiry,jdbcType=BIT}, #{notifyReportStatus,jdbcType=BIT}, #{notifyInquiryAnswer,jdbcType=BIT}, 
+      #{updateTime,jdbcType=TIMESTAMP})
+  </insert>
+  <update id="updateByPrimaryKey" parameterType="com.gneworks.dao.entity.UserNotificationSetting">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    update user_notification_setting
+    set notify_web_push = #{notifyWebPush,jdbcType=BIT},
+      notify_new_report = #{notifyNewReport,jdbcType=BIT},
+      notify_new_inquiry = #{notifyNewInquiry,jdbcType=BIT},
+      notify_report_status = #{notifyReportStatus,jdbcType=BIT},
+      notify_inquiry_answer = #{notifyInquiryAnswer,jdbcType=BIT},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where user_id = #{userId,jdbcType=CHAR}
+  </update>
+  <select id="selectByPrimaryKey" parameterType="java.lang.String" resultMap="BaseResultMap">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    select user_id, notify_web_push, notify_new_report, notify_new_inquiry, notify_report_status, 
+    notify_inquiry_answer, update_time
+    from user_notification_setting
+    where user_id = #{userId,jdbcType=CHAR}
+  </select>
+  <select id="selectAll" resultMap="BaseResultMap">
+    <!-- @mbg.generated: generated automatically, do not modify! -->
+    select user_id, notify_web_push, notify_new_report, notify_new_inquiry, notify_report_status, 
+    notify_inquiry_answer, update_time
+    from user_notification_setting
+  </select>
+</mapper>

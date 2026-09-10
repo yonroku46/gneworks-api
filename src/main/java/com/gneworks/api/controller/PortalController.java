@@ -161,4 +161,15 @@ public class PortalController extends BaseController {
     public BaseResponse getMyInquiries() {
         return portalService.getMyInquiries(getCurrentUserId());
     }
+
+    // ── [5. 현장 안내사항(공지)] ────────────────────────────
+
+    /**
+     * 현장 안내사항(공지) 및 대표 연락처 조회
+     * GET /portal/notice
+     */
+    @GetMapping("/notice")
+    public BaseResponse getNotice() {
+        return portalService.getNotice();
+    }
 }
