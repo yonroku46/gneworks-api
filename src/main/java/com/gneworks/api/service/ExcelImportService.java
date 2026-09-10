@@ -123,16 +123,29 @@ public class ExcelImportService {
                 for (int c = 0; c < row.getLastCellNum(); c++) {
                     String s = getCellString(row, c).replaceAll("\\s+", "");
                     if (s.isEmpty()) continue;
-                    if (s.equals("연번") || s.equals("순번") || s.equalsIgnoreCase("NO") || s.equalsIgnoreCase("NO.")) colSeq = c;
-                    else if (s.contains("세대주") || (s.equals("성명") && colHeadName == -1)) colHeadName = c;
-                    else if (s.equals("구분") || s.contains("대상구분")) colTargetType = c;
-                    else if (s.contains("시군구") || s.startsWith("지역")) colSigungu = c;
-                    else if (s.contains("도로명주소") || (s.contains("주소") && colAddress == -1)) colAddress = c;
-                    else if (s.contains("아파트") || s.contains("단지명") || s.contains("건물명") || s.contains("시설명")) colApt = c;
-                    else if (s.equals("동") || s.equals("동(호)")) colDong = c;
-                    else if (s.equals("호") || s.equals("호수") || s.equals("호(수)")) colHo = c;
-                    else if (s.contains("설치")) colInstall = c;
-                    else if (s.contains("비고")) colRemarks = c;
+                    if (s.equals("연번") || s.equals("순번") || s.equalsIgnoreCase("NO") || s.equalsIgnoreCase("NO.")) {
+                        colSeq = c;
+                    } else if (s.contains("세대주") && !s.contains("관계")) {
+                        colHeadName = c;
+                    } else if ((s.equals("성명") || s.equals("성명(세대주)") || s.equals("이름")) && colHeadName == -1 && !s.contains("관계")) {
+                        colHeadName = c;
+                    } else if (s.equals("구분") || s.contains("대상구분")) {
+                        colTargetType = c;
+                    } else if (s.contains("시군구") || s.startsWith("지역")) {
+                        colSigungu = c;
+                    } else if (s.contains("도로명주소") || (s.contains("주소") && colAddress == -1)) {
+                        colAddress = c;
+                    } else if (s.contains("아파트") || s.contains("단지명") || s.contains("건물명") || s.contains("시설명")) {
+                        colApt = c;
+                    } else if (s.equals("동") || s.equals("동(호)")) {
+                        colDong = c;
+                    } else if (s.equals("호") || s.equals("호수") || s.equals("호(수)")) {
+                        colHo = c;
+                    } else if (s.contains("설치")) {
+                        colInstall = c;
+                    } else if (s.contains("비고")) {
+                        colRemarks = c;
+                    }
                 }
             }
 
@@ -168,7 +181,7 @@ public class ExcelImportService {
                 if (aptName.contains("합계") || aptName.contains("소계") || aptName.contains("총계")
                         || aptName.equals("아파트(명칭)") || aptName.equals("아파트") || aptName.equals("단지명") || aptName.equals("건물명")
                         || address.contains("도로명주소") || address.contains("소재지")
-                        || dongRaw.contains("세대수") || dongRaw.contains("동(호)") || hoRaw.contains("호(수)")) {
+                        || dongRaw.contains("세대수") || dongRaw.contains("수량") || dongRaw.contains("동(호)") || hoRaw.contains("호(수)")) {
                     continue;
                 }
 
