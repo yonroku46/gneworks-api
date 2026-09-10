@@ -14,6 +14,9 @@ public class WorkReportRes extends ResponseData {
 
     private String householdId;
     private String siteId;
+    private String regionId;
+    private String region;
+    private String regionSido;
 
     @ExcelColumn(header = "현장명(아파트)", order = 2, width = 24)
     private String siteName;
@@ -41,6 +44,8 @@ public class WorkReportRes extends ResponseData {
 
     @ExcelColumn(header = "세대주명", order = 9, width = 14, align = "CENTER")
     private String headName;
+
+    private String targetType;
 
     private String installDate;
 

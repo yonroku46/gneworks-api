@@ -103,27 +103,42 @@
   </update>
 
   <select id="selectByPrimaryKey" parameterType="java.lang.String" resultMap="BaseResultMap">
-    select site_id, region_id, name, region, address, sido, sigungu, eupmyeondong, 
-    contact_phone, create_time
-    from site
-    where site_id = #{siteId,jdbcType=CHAR}
+    select s.site_id, s.region_id, s.name, 
+      coalesce(fr.name, s.region) as region, 
+      s.address, 
+      coalesce(fr.sido_name, s.sido) as sido, 
+      s.sigungu, s.eupmyeondong, 
+      s.contact_phone, s.create_time
+    from site s
+    left join fire_region fr on s.region_id = fr.region_id
+    where s.site_id = #{siteId,jdbcType=CHAR}
   </select>
 
   <select id="selectAll" resultMap="BaseResultMap">
-    select site_id, region_id, name, region, address, sido, sigungu, eupmyeondong, 
-    contact_phone, create_time
-    from site
+    select s.site_id, s.region_id, s.name, 
+      coalesce(fr.name, s.region) as region, 
+      s.address, 
+      coalesce(fr.sido_name, s.sido) as sido, 
+      s.sigungu, s.eupmyeondong, 
+      s.contact_phone, s.create_time
+    from site s
+    left join fire_region fr on s.region_id = fr.region_id
   </select>
 
   <!-- 현장 목록 조회 (필터 및 동수, 세대수 집계) -->
   <select id="selectSiteList" resultMap="SiteListResultMap">
     select 
-      s.site_id, s.region_id, s.name, s.region, s.address, s.sido, s.sigungu, s.eupmyeondong,
+      s.site_id, s.region_id, s.name, 
+      coalesce(fr.name, s.region) as region, 
+      s.address, 
+      coalesce(fr.sido_name, s.sido) as sido, 
+      s.sigungu, s.eupmyeondong,
       s.contact_phone, s.create_time,
       count(distinct h.household_id) as total_households,
       count(distinct h.dong) as dong_count,
       count(distinct case when wr.status = 'COMPLETED' then h.household_id end) as completed_households
     from site s
+    left join fire_region fr on s.region_id = fr.region_id
     left join household h on s.site_id = h.site_id
     left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0 and wr.status = 'COMPLETED'
     <where>
@@ -134,7 +149,7 @@
         and (s.name like concat('%', #{query}, '%') or s.address like concat('%', #{query}, '%'))
       </if>
     </where>
-    group by s.site_id
+    group by s.site_id, fr.name, fr.sido_name
     <choose>
       <when test="orderBy == 'RATE_DESC'">
         order by (case when count(distinct h.household_id) > 0 then count(distinct case when wr.status = 'COMPLETED' then h.household_id end) * 1.0 / count(distinct h.household_id) else 0 end) desc, s.create_time desc
@@ -151,7 +166,11 @@
   <!-- 현장 목록 페이징 조회 (대용량 데이터 대응: 서브쿼리로 LIMIT 후 조인) -->
   <select id="selectSiteListPaged" resultMap="SiteListResultMap">
     select 
-      s.site_id, s.region_id, s.name, s.region, s.address, s.sido, s.sigungu, s.eupmyeondong,
+      s.site_id, s.region_id, s.name, 
+      coalesce(fr.name, s.region) as region, 
+      s.address, 
+      coalesce(fr.sido_name, s.sido) as sido, 
+      s.sigungu, s.eupmyeondong,
       s.contact_phone, s.create_time,
       count(distinct h.household_id) as total_households,
       count(distinct h.dong) as dong_count,
@@ -170,9 +189,10 @@
       order by create_time desc
       limit #{size} offset #{offset}
     ) s
+    left join fire_region fr on s.region_id = fr.region_id
     left join household h on s.site_id = h.site_id
     left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0 and wr.status = 'COMPLETED'
-    group by s.site_id
+    group by s.site_id, fr.name, fr.sido_name
     order by s.create_time desc
   </select>
 
@@ -193,7 +213,11 @@
   <!-- 현장 상세 조회 (세대 목록 컬렉션 포함) -->
   <select id="selectSiteDetailWithHouseholds" parameterType="java.lang.String" resultMap="SiteDetailResultMap">
     select 
-      s.site_id, s.region_id, s.name, s.region, s.address, s.sido, s.sigungu, s.eupmyeondong,
+      s.site_id, s.region_id, s.name, 
+      coalesce(fr.name, s.region) as region, 
+      s.address, 
+      coalesce(fr.sido_name, s.sido) as sido, 
+      s.sigungu, s.eupmyeondong,
       s.contact_phone, s.create_time,
       h.household_id as hh_id,
       h.site_id as hh_site_id,
@@ -213,6 +237,7 @@
       (select count(distinct dong) from household where site_id = s.site_id) as dong_count,
       (select count(distinct h_sub.household_id) from household h_sub inner join work_report wr_sub on h_sub.household_id = wr_sub.household_id and wr_sub.delete_flg = 0 and wr_sub.status = 'COMPLETED' where h_sub.site_id = s.site_id) as completed_households
     from site s
+    left join fire_region fr on s.region_id = fr.region_id
     left join household h on s.site_id = h.site_id
     left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0
     where s.site_id = #{siteId}

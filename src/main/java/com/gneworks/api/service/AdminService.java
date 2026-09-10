@@ -475,8 +475,45 @@ public class AdminService {
         site.setSido(req.getSido() != null ? req.getSido().trim() : "");
         site.setSigungu(req.getSigungu() != null ? req.getSigungu().trim() : "");
         site.setEupmyeondong(req.getEupmyeondong() != null ? req.getEupmyeondong().trim() : "");
-        site.setRegion(req.getRegion() != null && !req.getRegion().trim().isEmpty() ? req.getRegion().trim() : site.getSigungu());
-        site.setRegionId(req.getRegionId() != null && !req.getRegionId().trim().isEmpty() ? req.getRegionId().trim() : null);
+        String finalRegionId = req.getRegionId() != null && !req.getRegionId().trim().isEmpty() ? req.getRegionId().trim() : null;
+        FireRegion fr = finalRegionId != null ? siteDao.selectFireRegionById(finalRegionId) : null;
+        if (fr == null) {
+            List<FireRegion> allFr = siteDao.selectAllFireRegions();
+            if (allFr != null && !allFr.isEmpty()) {
+                String eup = site.getEupmyeondong();
+                String sgg = site.getSigungu();
+                String targetSido = site.getSido();
+                if (eup != null && !eup.isEmpty()) {
+                    for (FireRegion candidate : allFr) {
+                        if (candidate.getEupmyeondongs() != null && candidate.getEupmyeondongs().contains(eup)) {
+                            if (targetSido == null || targetSido.isEmpty() || candidate.getSidoName().contains(targetSido) || targetSido.contains(candidate.getSidoName())) {
+                                fr = candidate;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (fr == null && sgg != null && !sgg.isEmpty()) {
+                    for (FireRegion candidate : allFr) {
+                        String cleanCandidate = candidate.getName();
+                        if (sgg.contains(cleanCandidate) || cleanCandidate.contains(sgg.replace("시", "").replace("군", "").replace("구", ""))) {
+                            if (targetSido == null || targetSido.isEmpty() || candidate.getSidoName().contains(targetSido) || targetSido.contains(candidate.getSidoName())) {
+                                fr = candidate;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (fr != null) {
+            site.setRegionId(fr.getRegionId());
+            site.setRegion(fr.getName());
+            site.setSido(fr.getSidoName());
+        } else {
+            site.setRegionId(finalRegionId);
+            site.setRegion(req.getRegion() != null && !req.getRegion().trim().isEmpty() ? req.getRegion().trim() : site.getSigungu());
+        }
         site.setContactPhone(req.getContactPhone() != null ? req.getContactPhone().trim() : null);
         site.setCreateTime(new Date());
 
@@ -511,8 +548,29 @@ public class AdminService {
         if (req.getSido() != null) existing.setSido(req.getSido().trim());
         if (req.getSigungu() != null) existing.setSigungu(req.getSigungu().trim());
         if (req.getEupmyeondong() != null) existing.setEupmyeondong(req.getEupmyeondong().trim());
-        if (req.getRegion() != null) existing.setRegion(req.getRegion().trim());
-        if (req.getRegionId() != null) existing.setRegionId(req.getRegionId().trim());
+        if (req.getRegionId() != null) {
+            String rid = req.getRegionId().trim();
+            existing.setRegionId(!rid.isEmpty() ? rid : null);
+            if (!rid.isEmpty()) {
+                FireRegion updateFr = siteDao.selectFireRegionById(rid);
+                if (updateFr != null) {
+                    existing.setRegion(updateFr.getName());
+                    existing.setSido(updateFr.getSidoName());
+                } else if (req.getRegion() != null) {
+                    existing.setRegion(req.getRegion().trim());
+                }
+            } else if (req.getRegion() != null) {
+                existing.setRegion(req.getRegion().trim());
+            }
+        } else if (existing.getRegionId() != null) {
+            FireRegion updateFr = siteDao.selectFireRegionById(existing.getRegionId());
+            if (updateFr != null) {
+                existing.setRegion(updateFr.getName());
+                existing.setSido(updateFr.getSidoName());
+            }
+        } else if (req.getRegion() != null) {
+            existing.setRegion(req.getRegion().trim());
+        }
 
         siteDao.updateSite(existing);
 

@@ -107,10 +107,10 @@ public class ExcelImportService {
                         site.setSiteId(KsuidGenerator.createId());
                         site.setName(aptName);
                         site.setAddress(address);
-                        site.setSido(sido);
+                        site.setSido(fireRegion != null && fireRegion.getSidoName() != null ? fireRegion.getSidoName() : sido);
                         site.setSigungu(sigungu);
                         site.setEupmyeondong(eupmyeondong);
-                        site.setRegion(sigungu);
+                        site.setRegion(regionName != null ? regionName : (fireRegion != null ? fireRegion.getName() : sigungu));
                         site.setRegionId(finalRegionId);
                         site.setCreateTime(new Date());
 

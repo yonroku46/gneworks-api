@@ -32,6 +32,9 @@
     <result column="household_id" property="householdId" />
     <result column="site_id" property="siteId" />
     <result column="site_name" property="siteName" />
+    <result column="region_id" property="regionId" />
+    <result column="region" property="region" />
+    <result column="region_sido" property="regionSido" />
     <result column="sido" property="sido" />
     <result column="sigungu" property="sigungu" />
     <result column="eupmyeondong" property="eupmyeondong" />
@@ -41,6 +44,7 @@
     <result column="dong" property="dong" />
     <result column="ho" property="ho" />
     <result column="head_name" property="headName" />
+    <result column="target_type" property="targetType" />
     <result column="install_date" property="installDate" />
     <result column="report_time" property="reportTime" />
     <result column="report_time" property="submittedAt" />
@@ -180,14 +184,23 @@
   <select id="selectReportList" parameterType="com.gneworks.dto.req.AdminReportSearchReq" resultMap="ReportDetailResultMap">
     select 
       wr.report_id, wr.household_id, wr.site_id, wr.user_id, wr.dong, wr.ho, wr.head_name,
+      coalesce(hh.target_type, 'GENERAL') as target_type,
       date_format(wr.install_date, '%Y-%m-%d') as install_date,
       date_format(wr.report_time, '%Y-%m-%d %H:%i') as report_time,
       wr.reporter_name, wr.confirmer_name, wr.confirmer_signature,
       wr.photo_door, wr.photo_before1, wr.photo_after1, wr.photo_before2, wr.photo_after2,
       wr.`status`, wr.remarks, wr.fix_reason, wr.create_time, wr.last_update,
-      s.name as site_name, s.sido, s.sigungu, s.eupmyeondong, s.address
+      s.name as site_name, s.sido, s.sigungu, s.eupmyeondong, s.address,
+      s.region_id,
+      coalesce(fr.name, s.region) as region,
+      coalesce(fr.sido_name, s.sido) as region_sido
     from work_report wr
     left join site s on wr.site_id = s.site_id
+    left join fire_region fr on s.region_id = fr.region_id
+    left join household hh on (
+      (wr.household_id is not null and wr.household_id != '' and wr.household_id = hh.household_id)
+      or ((wr.household_id is null or wr.household_id = '') and wr.site_id = hh.site_id and wr.dong = hh.dong and wr.ho = hh.ho)
+    )
     where wr.delete_flg = 0
     <if test="regionId != null and regionId != ''">
       and s.region_id = #{regionId}
@@ -405,28 +418,46 @@
   <select id="selectReportDetailById" parameterType="java.lang.String" resultMap="ReportDetailResultMap">
     select 
       wr.report_id, wr.household_id, wr.site_id, wr.user_id, wr.dong, wr.ho, wr.head_name,
+      coalesce(hh.target_type, 'GENERAL') as target_type,
       date_format(wr.install_date, '%Y-%m-%d') as install_date,
       date_format(wr.report_time, '%Y-%m-%d %H:%i') as report_time,
       wr.reporter_name, wr.confirmer_name, wr.confirmer_signature,
       wr.photo_door, wr.photo_before1, wr.photo_after1, wr.photo_before2, wr.photo_after2,
       wr.`status`, wr.remarks, wr.fix_reason, wr.create_time, wr.last_update,
-      s.name as site_name, s.sido, s.sigungu, s.eupmyeondong, s.address
+      s.name as site_name, s.sido, s.sigungu, s.eupmyeondong, s.address,
+      s.region_id,
+      coalesce(fr.name, s.region) as region,
+      coalesce(fr.sido_name, s.sido) as region_sido
     from work_report wr
     left join site s on wr.site_id = s.site_id
+    left join fire_region fr on s.region_id = fr.region_id
+    left join household hh on (
+      (wr.household_id is not null and wr.household_id != '' and wr.household_id = hh.household_id)
+      or ((wr.household_id is null or wr.household_id = '') and wr.site_id = hh.site_id and wr.dong = hh.dong and wr.ho = hh.ho)
+    )
     where wr.report_id = #{reportId} and wr.delete_flg = 0
     limit 1
   </select>
   <select id="selectReportDetailByHouseholdId" parameterType="java.lang.String" resultMap="ReportDetailResultMap">
     select 
       wr.report_id, wr.household_id, wr.site_id, wr.user_id, wr.dong, wr.ho, wr.head_name,
+      coalesce(hh.target_type, 'GENERAL') as target_type,
       date_format(wr.install_date, '%Y-%m-%d') as install_date,
       date_format(wr.report_time, '%Y-%m-%d %H:%i') as report_time,
       wr.reporter_name, wr.confirmer_name, wr.confirmer_signature,
       wr.photo_door, wr.photo_before1, wr.photo_after1, wr.photo_before2, wr.photo_after2,
       wr.`status`, wr.remarks, wr.fix_reason, wr.create_time, wr.last_update,
-      s.name as site_name, s.sido, s.sigungu, s.eupmyeondong, s.address
+      s.name as site_name, s.sido, s.sigungu, s.eupmyeondong, s.address,
+      s.region_id,
+      coalesce(fr.name, s.region) as region,
+      coalesce(fr.sido_name, s.sido) as region_sido
     from work_report wr
     left join site s on wr.site_id = s.site_id
+    left join fire_region fr on s.region_id = fr.region_id
+    left join household hh on (
+      (wr.household_id is not null and wr.household_id != '' and wr.household_id = hh.household_id)
+      or ((wr.household_id is null or wr.household_id = '') and wr.site_id = hh.site_id and wr.dong = hh.dong and wr.ho = hh.ho)
+    )
     where wr.household_id = #{householdId} and wr.delete_flg = 0
     limit 1
   </select>

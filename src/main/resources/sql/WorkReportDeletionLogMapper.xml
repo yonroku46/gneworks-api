@@ -150,12 +150,6 @@
       <if test="regionId != null and regionId != ''">
         and region_id = #{regionId}
       </if>
-      <if test="sido != null and sido != ''">
-        and sido = #{sido}
-      </if>
-      <if test="sigungu != null and sigungu != ''">
-        and sigungu = #{sigungu}
-      </if>
       <if test="startDate != null and startDate != ''">
         and deleted_time &gt;= concat(#{startDate}, ' 00:00:00')
       </if>
@@ -186,12 +180,6 @@
     <where>
       <if test="regionId != null and regionId != ''">
         and region_id = #{regionId}
-      </if>
-      <if test="sido != null and sido != ''">
-        and sido = #{sido}
-      </if>
-      <if test="sigungu != null and sigungu != ''">
-        and sigungu = #{sigungu}
       </if>
       <if test="startDate != null and startDate != ''">
         and deleted_time &gt;= concat(#{startDate}, ' 00:00:00')
