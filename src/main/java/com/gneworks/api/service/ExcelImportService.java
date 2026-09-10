@@ -149,6 +149,9 @@ public class ExcelImportService {
 
             int startRow = headerRow != -1 ? headerRow + 1 : 3;
 
+            // 아파트명별 기확인 주소 캐시 (주소 셀 누락 시 자동 상속용)
+            Map<String, String> aptNameToAddressMap = new HashMap<>();
+
             // 3. 데이터 행 순회 및 파싱
             for (int i = startRow; i <= lastRow; i++) {
                 Row row = sheet.getRow(i);
@@ -161,8 +164,16 @@ public class ExcelImportService {
                 String hoRaw    = getCellString(row, colHo);
                 String seqNo    = colSeq != -1 ? getCellString(row, colSeq) : "";
 
-                // 합계/소계/헤더 잔여 행 스킵
-                if (aptName.contains("합계") || aptName.contains("소계") || aptName.equals("아파트(명칭)") || address.contains("도로명주소")) {
+                // 합계/소계/헤더 잔여 행 및 통계 요약표 스킵
+                if (aptName.contains("합계") || aptName.contains("소계") || aptName.contains("총계")
+                        || aptName.equals("아파트(명칭)") || aptName.equals("아파트") || aptName.equals("단지명") || aptName.equals("건물명")
+                        || address.contains("도로명주소") || address.contains("소재지")
+                        || dongRaw.contains("세대수") || dongRaw.contains("동(호)") || hoRaw.contains("호(수)")) {
+                    continue;
+                }
+
+                // 주소도 없고 세대주도 없고 연번도 없는 행 (엑셀 하단 통계/요약 테이블 등) 스킵
+                if (address.isEmpty() && headName.isEmpty() && seqNo.isEmpty()) {
                     continue;
                 }
 
@@ -170,8 +181,18 @@ public class ExcelImportService {
                 if (aptName.isEmpty() && address.isEmpty()) {
                     continue;
                 }
+
+                // 주소가 비어있지만 앞선 행에서 동일 아파트명의 주소가 확인된 경우 상속
+                if (!aptName.isEmpty() && address.isEmpty() && aptNameToAddressMap.containsKey(aptName)) {
+                    address = aptNameToAddressMap.get(aptName);
+                }
+
                 if (aptName.isEmpty()) aptName = address;
                 if (address.isEmpty()) address = aptName;
+
+                if (!aptName.isEmpty() && !address.equals(aptName)) {
+                    aptNameToAddressMap.put(aptName, address);
+                }
 
                 // 동/호수 미기재 세대 대응 (예: 평택 등 호수 공란 명단 유실 방지)
                 if (dongRaw.isEmpty()) dongRaw = "-";
