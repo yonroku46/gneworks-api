@@ -618,7 +618,7 @@ public class PortalService {
     }
 
     /**
-     * 시공 보고서 목록 조회 (담당 지역 현장들 또는 본인 작성)
+     * 시공 보고서 목록 조회 (작업자 본인 작성 보고서)
      */
     @Transactional(readOnly = true)
     public BaseResponse getReports(String userId, AdminReportSearchReq req) {
@@ -626,19 +626,10 @@ public class PortalService {
             req = new AdminReportSearchReq();
         }
 
-        // 특정 현장이나 소방관할이 지정되지 않은 경우, 작업자 본인 보고서 + 배정된 관할 지역 보고서 대상
-        if ((req.getSiteId() == null || req.getSiteId().trim().isEmpty())
-                && (req.getRegionId() == null || req.getRegionId().trim().isEmpty())) {
-            req.setPortalUserId(userId);
-            List<UserAssignedRegionDetailRes> assigned = siteDao.selectAssignedRegionsByUserId(userId);
-            if (assigned != null && !assigned.isEmpty()) {
-                List<String> regionIds = assigned.stream()
-                        .map(UserAssignedRegionDetailRes::getRegionId)
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
-                req.setAssignedRegionIds(regionIds);
-            }
-        }
+        // 포탈 작업자는 항상 본인이 작성한 보고서만 조회
+        req.setUserId(userId);
+        req.setPortalUserId(null);
+        req.setAssignedRegionIds(null);
 
         boolean isPaged = (req.getPage() != null && req.getPage() > 0) || (req.getSize() != null && req.getSize() > 0);
         if (isPaged) {
@@ -668,6 +659,9 @@ public class PortalService {
         SimpleDateFormat koreanDateFmt = new SimpleDateFormat("yyyy년 M월 d일");
         SimpleDateFormat timeFmt = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 
+        if (res.getInstallerId() == null && res.getUserId() != null) {
+            res.setInstallerId(res.getUserId());
+        }
         if (res.getInstallDate() != null && !res.getInstallDate().trim().isEmpty() && res.getInstallDateFormatted() == null) {
             try {
                 Date d = dateFmt.parse(res.getInstallDate().trim());
@@ -677,6 +671,24 @@ public class PortalService {
         if (res.getSubmittedAt() == null && res.getReportTime() != null) {
             res.setSubmittedAt(res.getReportTime());
         }
+    }
+
+    /**
+     * 포탈 작업자 본인의 시공 보고서 요약 통계 조회 (초경량 집계)
+     */
+    @Transactional(readOnly = true)
+    public BaseResponse getMyReportSummary(String userId) {
+        Map<String, Object> summary = workReportDao.selectReportSummary(null, userId);
+        AdminDashboardSummaryRes res = new AdminDashboardSummaryRes();
+        if (summary != null) {
+            res.setTotalReports(((Number) summary.getOrDefault("totalReports", 0L)).longValue());
+            res.setTodayReports(((Number) summary.getOrDefault("todayReports", 0L)).longValue());
+            res.setPendingReports(((Number) summary.getOrDefault("pendingReports", 0L)).longValue());
+            res.setRejectedReports(((Number) summary.getOrDefault("rejectedReports", 0L)).longValue());
+            res.setCompletedReports(((Number) summary.getOrDefault("completedReports", 0L)).longValue());
+            res.setIssueReportsCount(((Number) summary.getOrDefault("issueReportsCount", 0L)).longValue());
+        }
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
     }
 
     // ── [4. 문의 내역 관리 (본인 전용)] ────────────────────────────

@@ -67,6 +67,7 @@ public interface WorkReportMapper {
     );
 
     Map<String, Object> selectReportSummary(
-            @Param("regionId") String regionId
+            @Param("regionId") String regionId,
+            @Param("userId") String userId
     );
 }

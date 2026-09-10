@@ -143,7 +143,16 @@ public class PortalController extends BaseController {
     }
 
     /**
-     * 시공 보고서 목록 조회 (담당 현장 또는 본인 작성)
+     * 본인 시공 보고서 요약 통계 조회 (초경량)
+     * GET /portal/reports/summary
+     */
+    @GetMapping("/reports/summary")
+    public BaseResponse getMyReportSummary() {
+        return portalService.getMyReportSummary(getCurrentUserId());
+    }
+
+    /**
+     * 시공 보고서 목록 조회 (작업자 본인 작성)
      * GET /portal/reports
      */
     @GetMapping("/reports")

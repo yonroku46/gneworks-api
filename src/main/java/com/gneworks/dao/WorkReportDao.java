@@ -199,12 +199,17 @@ public class WorkReportDao {
     }
 
     public Map<String, Object> selectReportSummary(String regionId) {
+        return selectReportSummary(regionId, null);
+    }
+
+    public Map<String, Object> selectReportSummary(String regionId, String userId) {
         try {
-            return workReportMapper.selectReportSummary(regionId);
+            return workReportMapper.selectReportSummary(regionId, userId);
         } catch (Exception exception) {
             final String methodName = "WorkReportMapper#selectReportSummary";
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("regionId", regionId);
+            paramMap.put("userId", userId);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
             log.error(overview + detail);

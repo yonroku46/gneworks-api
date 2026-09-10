@@ -398,6 +398,9 @@
     <if test="regionId != null and regionId != ''">
       and s.region_id = #{regionId}
     </if>
+    <if test="userId != null and userId != ''">
+      and wr.user_id = #{userId}
+    </if>
   </select>
   <select id="selectReportDetailById" parameterType="java.lang.String" resultMap="ReportDetailResultMap">
     select 
