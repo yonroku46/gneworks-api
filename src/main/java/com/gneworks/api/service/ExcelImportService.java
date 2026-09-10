@@ -21,18 +21,18 @@ import java.util.*;
 @Slf4j
 public class ExcelImportService {
 
-    // 엑셀 컬럼 인덱스 (00소방서 시트 기준)
-    private static final int COL_HEAD_NAME    = 1;  // 세대주 성명
-    private static final int COL_TARGET_TYPE  = 3;  // 구분 (아동/노인/장애인)
-    private static final int COL_SIGUNGU_RAW  = 4;  // 지역(시군구) - 파싱용
-    private static final int COL_ADDRESS      = 5;  // 도로명주소
-    private static final int COL_APT_NAME     = 6;  // 아파트 명칭
-    private static final int COL_DONG         = 7;  // 동
-    private static final int COL_HO           = 8;  // 호수
-    private static final int COL_INSTALL      = 16; // 연기감지기 설치 유무 (O/X)
-    private static final int COL_REMARKS      = 17; // 비고
+    // 기본 엑셀 컬럼 인덱스 (기본 00소방서 시트 폴백용)
+    private static final int COL_DEFAULT_HEAD    = 1;  // 세대주 성명
+    private static final int COL_DEFAULT_TYPE    = 3;  // 구분 (아동/노인/장애인)
+    private static final int COL_DEFAULT_SIGUNGU = 4;  // 지역(시군구)
+    private static final int COL_DEFAULT_ADDR    = 5;  // 도로명주소
+    private static final int COL_DEFAULT_APT     = 6;  // 아파트 명칭
+    private static final int COL_DEFAULT_DONG    = 7;  // 동
+    private static final int COL_DEFAULT_HO      = 8;  // 호수
+    private static final int COL_DEFAULT_INSTALL = 16; // 연기감지기 설치 유무 (O/X)
+    private static final int COL_DEFAULT_REMARKS = 17; // 비고
 
-    private static final int BATCH_SIZE       = 500; // 벌크 삽입 단위
+    private static final int BATCH_SIZE          = 500; // 벌크 삽입 단위
 
     @Autowired
     private SiteDao siteDao;
@@ -63,27 +63,126 @@ public class ExcelImportService {
         List<Household> pendingHouseholds = new ArrayList<>();
 
         try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
-            // 메인 시트 (00소방서) 사용
+            // 1. 시트 탐색: '00소방서' 우선, 없으면 소방서/세대/원본/명단 포함 시트 탐색, 최종 fallback 첫 번째 시트
             Sheet sheet = workbook.getSheet("00소방서");
+            if (sheet == null) {
+                for (int s = 0; s < workbook.getNumberOfSheets(); s++) {
+                    String sName = workbook.getSheetName(s);
+                    if (sName.contains("소방서") || sName.contains("세대") || sName.contains("원본") || sName.contains("명단")) {
+                        sheet = workbook.getSheetAt(s);
+                        break;
+                    }
+                }
+            }
             if (sheet == null) {
                 sheet = workbook.getSheetAt(0);
             }
 
             int lastRow = sheet.getLastRowNum();
-            // 헤더 3행(0~2) 스킵, 3행(index 3)부터 데이터
-            for (int i = 3; i <= lastRow; i++) {
+
+            // 2. 동적 헤더 행 및 컬럼 감지 (다양한 관서별 엑셀 양식/컬럼 시프트 자동 대응)
+            int headerRow = -1;
+            for (int r = 0; r <= Math.min(6, lastRow); r++) {
+                Row row = sheet.getRow(r);
+                if (row == null) continue;
+                boolean hasDong = false;
+                boolean hasHo = false;
+                for (int c = 0; c < row.getLastCellNum(); c++) {
+                    String s = getCellString(row, c).replaceAll("\\s+", "");
+                    if (s.equals("동") || s.equals("동(호)")) hasDong = true;
+                    if (s.equals("호") || s.equals("호수") || s.equals("호(수)")) hasHo = true;
+                }
+                if (hasDong && hasHo) {
+                    headerRow = r;
+                    break;
+                }
+            }
+            if (headerRow == -1) {
+                for (int r = 0; r <= Math.min(6, lastRow); r++) {
+                    Row row = sheet.getRow(r);
+                    if (row == null) continue;
+                    for (int c = 0; c < row.getLastCellNum(); c++) {
+                        String s = getCellString(row, c).replaceAll("\\s+", "");
+                        if (s.contains("도로명주소") || s.contains("아파트") || s.contains("주소")) {
+                            headerRow = r;
+                            break;
+                        }
+                    }
+                    if (headerRow != -1) break;
+                }
+            }
+
+            int colSeq = -1, colHeadName = -1, colTargetType = -1, colSigungu = -1;
+            int colAddress = -1, colApt = -1, colDong = -1, colHo = -1;
+            int colInstall = -1, colRemarks = -1;
+
+            int scanLimit = headerRow != -1 ? headerRow : Math.min(4, lastRow);
+            for (int r = 0; r <= scanLimit; r++) {
+                Row row = sheet.getRow(r);
+                if (row == null) continue;
+                for (int c = 0; c < row.getLastCellNum(); c++) {
+                    String s = getCellString(row, c).replaceAll("\\s+", "");
+                    if (s.isEmpty()) continue;
+                    if (s.equals("연번") || s.equals("순번") || s.equalsIgnoreCase("NO") || s.equalsIgnoreCase("NO.")) colSeq = c;
+                    else if (s.contains("세대주") || (s.equals("성명") && colHeadName == -1)) colHeadName = c;
+                    else if (s.equals("구분") || s.contains("대상구분")) colTargetType = c;
+                    else if (s.contains("시군구") || s.startsWith("지역")) colSigungu = c;
+                    else if (s.contains("도로명주소") || (s.contains("주소") && colAddress == -1)) colAddress = c;
+                    else if (s.contains("아파트") || s.contains("단지명") || s.contains("건물명") || s.contains("시설명")) colApt = c;
+                    else if (s.equals("동") || s.equals("동(호)")) colDong = c;
+                    else if (s.equals("호") || s.equals("호수") || s.equals("호(수)")) colHo = c;
+                    else if (s.contains("설치")) colInstall = c;
+                    else if (s.contains("비고")) colRemarks = c;
+                }
+            }
+
+            // 폴백 기본값 지정
+            if (colDong == -1) colDong = COL_DEFAULT_DONG;
+            if (colHo == -1) colHo = COL_DEFAULT_HO;
+            if (colApt == -1) colApt = COL_DEFAULT_APT;
+            if (colAddress == -1) colAddress = COL_DEFAULT_ADDR;
+            if (colHeadName == -1) colHeadName = COL_DEFAULT_HEAD;
+            if (colTargetType == -1) colTargetType = COL_DEFAULT_TYPE;
+            if (colSigungu == -1) colSigungu = COL_DEFAULT_SIGUNGU;
+            if (colInstall == -1) colInstall = COL_DEFAULT_INSTALL;
+            if (colRemarks == -1) colRemarks = COL_DEFAULT_REMARKS;
+
+            int startRow = headerRow != -1 ? headerRow + 1 : 3;
+
+            // 3. 데이터 행 순회 및 파싱
+            for (int i = startRow; i <= lastRow; i++) {
                 Row row = sheet.getRow(i);
                 if (row == null) continue;
 
-                String aptName  = getCellString(row, COL_APT_NAME);
-                String address  = getCellString(row, COL_ADDRESS);
-                String headName = getCellString(row, COL_HEAD_NAME).replaceAll("\\s+", "");
-                String dongRaw  = getCellString(row, COL_DONG);
-                String hoRaw    = getCellString(row, COL_HO);
+                String aptName  = getCellString(row, colApt);
+                String address  = getCellString(row, colAddress);
+                String headName = colHeadName != -1 ? getCellString(row, colHeadName).replaceAll("\\s+", "") : "";
+                String dongRaw  = getCellString(row, colDong);
+                String hoRaw    = getCellString(row, colHo);
+                String seqNo    = colSeq != -1 ? getCellString(row, colSeq) : "";
 
-                // 필수 데이터 없으면 skip
-                if (aptName.isEmpty() || address.isEmpty() || dongRaw.isEmpty() || hoRaw.isEmpty()) {
+                // 합계/소계/헤더 잔여 행 스킵
+                if (aptName.contains("합계") || aptName.contains("소계") || aptName.equals("아파트(명칭)") || address.contains("도로명주소")) {
                     continue;
+                }
+
+                // 필수 데이터 확인 (아파트명과 주소 둘 다 없으면 스킵)
+                if (aptName.isEmpty() && address.isEmpty()) {
+                    continue;
+                }
+                if (aptName.isEmpty()) aptName = address;
+                if (address.isEmpty()) address = aptName;
+
+                // 동/호수 미기재 세대 대응 (예: 평택 등 호수 공란 명단 유실 방지)
+                if (dongRaw.isEmpty()) dongRaw = "-";
+                if (hoRaw.isEmpty()) {
+                    if (!seqNo.isEmpty()) {
+                        hoRaw = "연번" + seqNo;
+                    } else if (!headName.isEmpty()) {
+                        hoRaw = headName;
+                    } else {
+                        hoRaw = (i + 1) + "호";
+                    }
                 }
 
                 // ── 1. SITE 처리 ──────────────────────────────
@@ -98,7 +197,7 @@ public class ExcelImportService {
                         siteSkipped++;
                     } else {
                         // 신규 삽입
-                        String[] parsed = parseAddress(address, getCellString(row, COL_SIGUNGU_RAW));
+                        String[] parsed = parseAddress(address, colSigungu != -1 ? getCellString(row, colSigungu) : null);
                         String sido       = parsed[0];
                         String sigungu    = parsed[1];
                         String eupmyeondong = parsed[2];
@@ -144,9 +243,9 @@ public class ExcelImportService {
                 }
                 existingHouseholds.add(hhKey);
 
-                String targetType   = mapTargetType(getCellString(row, COL_TARGET_TYPE));
-                String installStatus = mapInstallStatus(getCellString(row, COL_INSTALL));
-                String remarks      = getCellString(row, COL_REMARKS);
+                String targetType    = mapTargetType(colTargetType != -1 ? getCellString(row, colTargetType) : "");
+                String installStatus = mapInstallStatus(colInstall != -1 ? getCellString(row, colInstall) : "");
+                String remarks       = colRemarks != -1 ? getCellString(row, colRemarks) : "";
 
                 Household household = new Household();
                 household.setHouseholdId(KsuidGenerator.createId());
