@@ -74,7 +74,6 @@ public class AdminService {
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
     private static final SimpleDateFormat DATETIME_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     private static final SimpleDateFormat DATETIME_MINUTE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm");
-    private static final SimpleDateFormat BIRTH_PW_FORMAT = new SimpleDateFormat("yyMMdd");
     private static final Information INFO_SUCCESS = new Information("SUCCESS", "SUCCESS");
 
     @Autowired
@@ -143,9 +142,6 @@ public class AdminService {
             res.setPostalCode(u.getPostalCode());
             res.setDetailAddress(u.getDetailAddress());
 
-            if (u.getBirthday() != null) {
-                res.setBirthday(DATE_FORMAT.format(u.getBirthday()));
-            }
             if (u.getLastUpdate() != null) {
                 res.setLastUpdated(DATETIME_FORMAT.format(u.getLastUpdate()));
                 res.setCreateTime(DATETIME_FORMAT.format(u.getLastUpdate()));
@@ -192,7 +188,7 @@ public class AdminService {
     }
 
     /**
-     * 신규 작업자 계정 생성 (기본 아이디: 하이픈 없는 휴대폰번호, 초기 비밀번호: 생년월일 6자리 yyMMdd)
+     * 신규 작업자 계정 생성 (기본 아이디: 하이픈 없는 휴대폰번호, 초기 비밀번호: 전화번호 끝 4자리)
      */
     @Transactional
     public BaseResponse createUser(String operatorUserId, AdminUserReq req) {
@@ -235,19 +231,9 @@ public class AdminService {
         newUser.setDeleteFlg((byte) 0);
         newUser.setLastUpdate(new Date());
 
-        if (req.getBirthday() == null || req.getBirthday().trim().isEmpty()) {
-            return ResponseUtils.generateDtoFailed(new Information("INVALID_BIRTHDAY", "BIRTHDAY_REQUIRED"));
-        }
-
-        try {
-            newUser.setBirthday(DATE_FORMAT.parse(req.getBirthday().trim()));
-        } catch (Exception e) {
-            log.warn("Invalid birthday format: {}", req.getBirthday());
-            return ResponseUtils.generateDtoFailed(new Information("INVALID_BIRTHDAY", "INVALID_BIRTHDAY_FORMAT"));
-        }
-
-        // 초기 비밀번호 세팅: 생년월일 6자리(yyMMdd) 필수 (전화번호 대체 불가)
-        String rawPw = BIRTH_PW_FORMAT.format(newUser.getBirthday());
+        // 초기 비밀번호 세팅: 전화번호 끝 4자리
+        String phoneDigits = newUser.getPhoneNum().replaceAll("[^0-9]", "");
+        String rawPw = phoneDigits.length() >= 4 ? phoneDigits.substring(phoneDigits.length() - 4) : phoneDigits;
         newUser.setUserPw(passwordEncoder.encode(rawPw));
 
         userDao.insertUser(newUser);
@@ -283,15 +269,6 @@ public class AdminService {
         if (req.getPostalCode() != null) user.setPostalCode(req.getPostalCode());
         if (req.getDetailAddress() != null) user.setDetailAddress(req.getDetailAddress());
 
-        if (req.getBirthday() != null && !req.getBirthday().trim().isEmpty()) {
-            try {
-                user.setBirthday(DATE_FORMAT.parse(req.getBirthday().trim()));
-            } catch (Exception e) {
-                log.warn("Invalid birthday format: {}", req.getBirthday());
-                return ResponseUtils.generateDtoFailed(new Information("INVALID_BIRTHDAY", "INVALID_BIRTHDAY_FORMAT"));
-            }
-        }
-
         userDao.updateUserByAdmin(user);
 
         ActionRes res = new ActionRes(user.getUserId());
@@ -302,7 +279,7 @@ public class AdminService {
     }
 
     /**
-     * 비밀번호 초기화 (생년월일 6자리 yyMMdd 필수)
+     * 비밀번호 초기화 (전화번호 끝 4자리)
      */
     @Transactional
     public BaseResponse resetPassword(String operatorUserId, String targetUserId) {
@@ -319,12 +296,16 @@ public class AdminService {
             return ResponseUtils.generateDtoFailed(new Information(MessageIdConst.E_USER_NOT_FOUND, "USER_NOT_FOUND"));
         }
 
-        // 비밀번호 초기화: 생년월일 6자리(yyMMdd) 필수 (전화번호로 대체 불가)
-        if (user.getBirthday() == null) {
-            return ResponseUtils.generateDtoFailed(new Information("CANNOT_RESET_PASSWORD", "BIRTHDAY_REQUIRED_FOR_RESET"));
+        // 비밀번호 초기화: 전화번호 끝 4자리
+        if (user.getPhoneNum() == null || user.getPhoneNum().trim().isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("CANNOT_RESET_PASSWORD", "PHONE_NUM_REQUIRED_FOR_RESET"));
+        }
+        String phoneDigits = user.getPhoneNum().replaceAll("[^0-9]", "");
+        if (phoneDigits.length() < 4) {
+            return ResponseUtils.generateDtoFailed(new Information("CANNOT_RESET_PASSWORD", "INVALID_PHONE_NUM"));
         }
 
-        String rawPw = BIRTH_PW_FORMAT.format(user.getBirthday());
+        String rawPw = phoneDigits.substring(phoneDigits.length() - 4);
         String encodedPw = passwordEncoder.encode(rawPw);
         userDao.updatePassword(user.getUserId(), encodedPw);
 

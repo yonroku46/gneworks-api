@@ -23,23 +23,20 @@ public class AdminUserRes extends ResponseData {
     @ExcelColumn(header = "성별", order = 4, width = 10, align = "CENTER")
     private String gender;
 
-    @ExcelColumn(header = "생년월일", order = 5, width = 14, align = "CENTER")
-    private String birthday;
-
-    @ExcelColumn(header = "우편번호", order = 6, width = 12, align = "CENTER")
+    @ExcelColumn(header = "우편번호", order = 5, width = 12, align = "CENTER")
     private String postalCode;
 
-    @ExcelColumn(header = "주소", order = 7, width = 35)
+    @ExcelColumn(header = "주소", order = 6, width = 35)
     private String detailAddress;
 
-    @ExcelColumn(header = "담당지역 수", order = 8, width = 14, align = "CENTER")
+    @ExcelColumn(header = "담당지역 수", order = 7, width = 14, align = "CENTER")
     private Integer regionCount;
 
-    @ExcelColumn(header = "작업 실적(건)", order = 9, width = 14, align = "CENTER")
+    @ExcelColumn(header = "작업 실적(건)", order = 8, width = 14, align = "CENTER")
     private Integer reportCount;
 
     private String lastUpdated;
 
-    @ExcelColumn(header = "등록일시", order = 10, width = 18, align = "CENTER")
+    @ExcelColumn(header = "등록일시", order = 9, width = 18, align = "CENTER")
     private String createTime;
 }

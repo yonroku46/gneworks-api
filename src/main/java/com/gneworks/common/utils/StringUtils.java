@@ -9,9 +9,6 @@ import org.springframework.stereotype.Component;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.reflect.Type;
-import java.time.LocalDate;
-import java.time.Period;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -202,23 +199,5 @@ public class StringUtils {
      */
     public static boolean isBlank(String str) {
         return str == null || str.trim().isEmpty();
-    }
-
-    /**
-     * 생년월일을 현재 나이로 변환
-     *
-     * @param birthday 문자열
-     * @return
-     */
-    public static int calculateAge(String birthday) {
-        // 문자열을 LocalDate 객체로 변환
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        LocalDate birthDate = LocalDate.parse(birthday, formatter);
-        LocalDate currentDate = LocalDate.now();
-
-        // 현재 날짜와 생년월일 날짜의 차이를 계산
-        int age = Period.between(birthDate, currentDate).getYears();
-
-        return age;
     }
 }

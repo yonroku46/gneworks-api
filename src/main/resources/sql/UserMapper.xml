@@ -8,7 +8,6 @@
     <result column="phone_num" jdbcType="VARCHAR" property="phoneNum" />
     <result column="profile_img" jdbcType="VARCHAR" property="profileImg" />
     <result column="role_id" jdbcType="INTEGER" property="roleId" />
-    <result column="birthday" jdbcType="DATE" property="birthday" />
     <result column="gender" jdbcType="VARCHAR" property="gender" />
     <result column="postal_code" jdbcType="VARCHAR" property="postalCode" />
     <result column="detail_address" jdbcType="VARCHAR" property="detailAddress" />
@@ -22,12 +21,12 @@
   <insert id="insert" parameterType="com.gneworks.dao.entity.User">
     insert into user (user_id, user_name, user_pw, 
       phone_num, profile_img, role_id, 
-      birthday, gender, postal_code, 
+      gender, postal_code, 
       detail_address, last_update, delete_flg
       )
     values (#{userId,jdbcType=CHAR}, #{userName,jdbcType=VARCHAR}, #{userPw,jdbcType=VARCHAR}, 
       #{phoneNum,jdbcType=VARCHAR}, #{profileImg,jdbcType=VARCHAR}, #{roleId,jdbcType=INTEGER}, 
-      #{birthday,jdbcType=DATE}, #{gender,jdbcType=VARCHAR}, #{postalCode,jdbcType=VARCHAR}, 
+      #{gender,jdbcType=VARCHAR}, #{postalCode,jdbcType=VARCHAR}, 
       #{detailAddress,jdbcType=VARCHAR}, #{lastUpdate,jdbcType=TIMESTAMP}, #{deleteFlg,jdbcType=TINYINT}
       )
   </insert>
@@ -38,7 +37,6 @@
       phone_num = #{phoneNum,jdbcType=VARCHAR},
       profile_img = #{profileImg,jdbcType=VARCHAR},
       role_id = #{roleId,jdbcType=INTEGER},
-      birthday = #{birthday,jdbcType=DATE},
       gender = #{gender,jdbcType=VARCHAR},
       postal_code = #{postalCode,jdbcType=VARCHAR},
       detail_address = #{detailAddress,jdbcType=VARCHAR},
@@ -47,13 +45,13 @@
     where user_id = #{userId,jdbcType=CHAR}
   </update>
   <select id="selectByPrimaryKey" parameterType="java.lang.String" resultMap="BaseResultMap">
-    select user_id, user_name, user_pw, phone_num, profile_img, role_id, birthday, gender, 
+    select user_id, user_name, user_pw, phone_num, profile_img, role_id, gender, 
     postal_code, detail_address, last_update, delete_flg
     from user
     where user_id = #{userId,jdbcType=CHAR}
   </select>
   <select id="selectAll" resultMap="BaseResultMap">
-    select user_id, user_name, user_pw, phone_num, profile_img, role_id, birthday, gender, 
+    select user_id, user_name, user_pw, phone_num, profile_img, role_id, gender, 
     postal_code, detail_address, last_update, delete_flg
     from user
   </select>
@@ -65,7 +63,7 @@
     where user_id = #{userId,jdbcType=CHAR} and delete_flg = 0
   </select>
   <select id="selectAllActiveUsers" resultMap="BaseResultMap">
-    select user_id, user_name, phone_num, profile_img, role_id, birthday, gender,
+    select user_id, user_name, phone_num, profile_img, role_id, gender,
            postal_code, detail_address, last_update, delete_flg
     from user
     where delete_flg = 0
@@ -79,7 +77,6 @@
       user_pw = #{userPw,jdbcType=VARCHAR},
       phone_num = #{phoneNum,jdbcType=VARCHAR},
       profile_img = #{profileImg,jdbcType=VARCHAR},
-      birthday = #{birthday,jdbcType=DATE},
       gender = #{gender,jdbcType=VARCHAR},
       postal_code = #{postalCode,jdbcType=VARCHAR},
       detail_address = #{detailAddress,jdbcType=VARCHAR},
@@ -92,7 +89,6 @@
     set
       user_name = #{userName,jdbcType=VARCHAR},
       phone_num = #{phoneNum,jdbcType=VARCHAR},
-      birthday = #{birthday,jdbcType=DATE},
       gender = #{gender,jdbcType=VARCHAR},
       postal_code = #{postalCode,jdbcType=VARCHAR},
       detail_address = #{detailAddress,jdbcType=VARCHAR},
@@ -130,7 +126,6 @@
       u.phone_num as phoneNum,
       u.profile_img as profileImg,
       u.role_id as roleId,
-      date_format(u.birthday, '%Y-%m-%d') as birthday,
       u.gender,
       u.postal_code as postalCode,
       u.detail_address as detailAddress,
@@ -181,7 +176,7 @@
   </select>
 
   <select id="selectUsersByRoleId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
-    select user_id, user_name, user_pw, phone_num, profile_img, role_id, birthday, gender, 
+    select user_id, user_name, user_pw, phone_num, profile_img, role_id, gender, 
     postal_code, detail_address, last_update, delete_flg
     from user
     where role_id = #{roleId,jdbcType=INTEGER}
