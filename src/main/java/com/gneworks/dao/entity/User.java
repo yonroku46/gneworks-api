@@ -22,8 +22,6 @@ public class User {
     @Generated(value="org.mybatis.generator.api.MyBatisGenerator", comments="Source field: user.role_id, Type: INT, Remark: 역할 키")
     private Integer roleId;
 
-    @Generated(value="org.mybatis.generator.api.MyBatisGenerator", comments="Source field: user.birthday, Type: DATE, Remark: 생년월일")
-    private Date birthday;
 
     @Generated(value="org.mybatis.generator.api.MyBatisGenerator", comments="Source field: user.gender, Type: VARCHAR(5), Remark: 성별")
     private String gender;
@@ -100,15 +98,6 @@ public class User {
         this.roleId = roleId;
     }
 
-    @Generated("org.mybatis.generator.api.MyBatisGenerator")
-    public Date getBirthday() {
-        return birthday;
-    }
-
-    @Generated("org.mybatis.generator.api.MyBatisGenerator")
-    public void setBirthday(Date birthday) {
-        this.birthday = birthday;
-    }
 
     @Generated("org.mybatis.generator.api.MyBatisGenerator")
     public String getGender() {
