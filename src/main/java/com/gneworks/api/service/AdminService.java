@@ -30,6 +30,8 @@ import com.gneworks.dao.WorkReportDeletionLogDao;
 import com.gneworks.dao.entity.WorkReportDeletionLog;
 import com.gneworks.dao.SystemSettingsDao;
 import com.gneworks.dao.entity.SystemSettings;
+import com.gneworks.dto.req.AdminBatchDeleteReportsReq;
+import com.gneworks.dto.req.AdminBatchDeleteSitesReq;
 import com.gneworks.dto.req.AdminDeleteReportReq;
 import com.gneworks.dto.req.AdminDeletionLogSearchReq;
 import com.gneworks.dto.req.SystemSettingsReq;
@@ -576,6 +578,35 @@ public class AdminService {
         siteDao.deleteSite(siteId);
 
         ActionRes res = new ActionRes(siteId);
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
+    }
+
+    /**
+     * 현장 일괄 삭제 (연관 세대 일괄 삭제)
+     */
+    @Transactional
+    public BaseResponse batchDeleteSites(String operatorUserId, AdminBatchDeleteSitesReq req) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
+        }
+        if (req == null || req.getSiteIds() == null || req.getSiteIds().isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_PARAMETER", "SITE_IDS_REQUIRED"));
+        }
+
+        int deletedCount = 0;
+        for (String siteId : req.getSiteIds()) {
+            if (siteId == null || siteId.trim().isEmpty()) continue;
+            String cleanSiteId = siteId.trim();
+            Site existing = siteDao.selectSiteById(cleanSiteId);
+            if (existing == null) continue;
+
+            siteDao.deleteHouseholdsBySiteId(cleanSiteId);
+            siteDao.deleteSite(cleanSiteId);
+            deletedCount++;
+        }
+
+        log.info("Batch deleted {} sites by {}", deletedCount, operatorUserId);
+        ActionRes res = new ActionRes(String.valueOf(deletedCount));
         return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
     }
 
@@ -1186,7 +1217,50 @@ public class AdminService {
         User operator = userDao.findUser(operatorUserId.trim());
         String operatorName = (operator != null && operator.getUserName() != null) ? operator.getUserName() : "관리자";
 
-        // 2. 현장 메타 정보 상세 조회 (regionId, sido, sigungu, eupmyeondong, address 등)
+        executeDeleteWorkReport(existing, operatorUserId, operatorName, req.getDeleteReason().trim());
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ActionRes(reportId));
+    }
+
+    /**
+     * 시공 보고서 일괄 영구 삭제 (동일 사유 스냅샷 감사 로그 저장 + S3 사진 삭제 + 세대 상태 복원)
+     */
+    @Transactional
+    public BaseResponse batchDeleteWorkReports(String operatorUserId, AdminBatchDeleteReportsReq req) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
+        }
+        if (req == null || req.getReportIds() == null || req.getReportIds().isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_PARAMETER", "REPORT_IDS_REQUIRED"));
+        }
+        if (req.getDeleteReason() == null || req.getDeleteReason().trim().isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("DELETE_REASON_REQUIRED", "삭제 사유를 입력해 주세요."));
+        }
+
+        User operator = userDao.findUser(operatorUserId.trim());
+        String operatorName = (operator != null && operator.getUserName() != null) ? operator.getUserName() : "관리자";
+
+        int deletedCount = 0;
+        for (String reportId : req.getReportIds()) {
+            if (reportId == null || reportId.trim().isEmpty()) continue;
+            WorkReportRes existing = workReportDao.selectReportDetailById(reportId.trim());
+            if (existing == null) continue;
+
+            executeDeleteWorkReport(existing, operatorUserId, operatorName, req.getDeleteReason().trim());
+            deletedCount++;
+        }
+
+        log.info("Batch deleted {} work reports by {}({}), reason: {}",
+                deletedCount, operatorName, operatorUserId, req.getDeleteReason().trim());
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ActionRes(String.valueOf(deletedCount)));
+    }
+
+    /**
+     * 단일 시공 보고서 영구 삭제 내부 공통 처리
+     */
+    private void executeDeleteWorkReport(WorkReportRes existing, String operatorUserId, String operatorName, String deleteReason) {
+        // 1. 현장 메타 정보 상세 조회
         String siteName = existing.getSiteName() != null ? existing.getSiteName() : "";
         String regionId = null;
         String sido = existing.getSido();
@@ -1206,7 +1280,7 @@ public class AdminService {
             }
         }
 
-        // 3. 날짜 파싱 (installDate, reportTime)
+        // 2. 날짜 파싱 (installDate, reportTime)
         Date installDate = null;
         if (existing.getInstallDate() != null && !existing.getInstallDate().trim().isEmpty()) {
             try {
@@ -1225,7 +1299,7 @@ public class AdminService {
             }
         }
 
-        // 4. 세대 상태 복원 (UNINSTALLED)
+        // 3. 세대 상태 복원 (UNINSTALLED)
         if (existing.getHouseholdId() != null && !existing.getHouseholdId().trim().isEmpty()) {
             Household hh = siteDao.selectHouseholdById(existing.getHouseholdId().trim());
             if (hh != null) {
@@ -1234,7 +1308,7 @@ public class AdminService {
             }
         }
 
-        // 5. 삭제 로그(스냅샷) 영구 보존용 엔티티 생성 및 insert
+        // 4. 삭제 로그(스냅샷) 영구 보존용 엔티티 생성 및 insert
         WorkReportDeletionLog logRecord = new WorkReportDeletionLog();
         logRecord.setLogId(KsuidGenerator.createId());
         logRecord.setReportId(existing.getReportId());
@@ -1264,14 +1338,14 @@ public class AdminService {
         logRecord.setSigungu(sigungu);
         logRecord.setEupmyeondong(eupmyeondong);
         logRecord.setAddress(address);
-        logRecord.setDeleteReason(req.getDeleteReason().trim());
+        logRecord.setDeleteReason(deleteReason.trim());
         logRecord.setDeletedBy(operatorUserId.trim());
         logRecord.setDeletedByName(operatorName);
         logRecord.setDeletedTime(new Date());
 
         workReportDeletionLogDao.insert(logRecord);
 
-        // 6. S3 사진 파일들 안전 삭제
+        // 5. S3 사진 파일들 안전 삭제
         deleteS3PhotoSafely(existing.getPhotoDoor());
         deleteS3PhotoSafely(existing.getPhotoBefore1());
         deleteS3PhotoSafely(existing.getPhotoAfter1());
@@ -1279,13 +1353,11 @@ public class AdminService {
         deleteS3PhotoSafely(existing.getPhotoAfter2());
         deleteS3PhotoSafely(existing.getConfirmerSignature());
 
-        // 7. 원본 보고서 테이블에서 물리 삭제
-        workReportDao.deleteByPrimaryKey(reportId.trim());
+        // 6. 원본 보고서 테이블에서 물리 삭제
+        workReportDao.deleteByPrimaryKey(existing.getReportId().trim());
 
         log.info("Work report deleted successfully. reportId={}, operator={}({}), reason={}",
-                reportId, operatorName, operatorUserId, req.getDeleteReason().trim());
-
-        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ActionRes(reportId));
+                existing.getReportId(), operatorName, operatorUserId, deleteReason.trim());
     }
 
     private void deleteS3PhotoSafely(String photoPath) {

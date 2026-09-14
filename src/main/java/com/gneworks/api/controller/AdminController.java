@@ -3,6 +3,8 @@ package com.gneworks.api.controller;
 import com.gneworks.api.controller.base.BaseController;
 import com.gneworks.api.service.AdminService;
 import com.gneworks.aspect.attribute.CheckToken;
+import com.gneworks.dto.req.AdminBatchDeleteReportsReq;
+import com.gneworks.dto.req.AdminBatchDeleteSitesReq;
 import com.gneworks.dto.req.AdminDeleteReportReq;
 import com.gneworks.dto.req.AdminDeletionLogSearchReq;
 import com.gneworks.dto.req.AdminHouseholdReq;
@@ -175,6 +177,15 @@ public class AdminController extends BaseController {
     @DeleteMapping("/site/{siteId}")
     public BaseResponse deleteSite(@PathVariable("siteId") String siteId) {
         return adminService.deleteSite(getCurrentUserId(), siteId);
+    }
+
+    /**
+     * 현장 일괄 삭제 (연관 세대 일괄 삭제)
+     * POST /admin/site/batch-delete
+     */
+    @PostMapping("/site/batch-delete")
+    public BaseResponse batchDeleteSites(@Valid @RequestBody AdminBatchDeleteSitesReq req) {
+        return adminService.batchDeleteSites(getCurrentUserId(), req);
     }
 
     /**
@@ -374,6 +385,15 @@ public class AdminController extends BaseController {
     @DeleteMapping("/report/{reportId}")
     public BaseResponse deleteReport(@PathVariable("reportId") String reportId, @Valid @RequestBody AdminDeleteReportReq req) {
         return adminService.deleteWorkReport(getCurrentUserId(), reportId, req);
+    }
+
+    /**
+     * 시공 보고서 일괄 영구 삭제 (동일 사유 스냅샷 감사 로그 저장 및 사진/세대 정리)
+     * POST /admin/report/batch-delete
+     */
+    @PostMapping("/report/batch-delete")
+    public BaseResponse batchDeleteReports(@Valid @RequestBody AdminBatchDeleteReportsReq req) {
+        return adminService.batchDeleteWorkReports(getCurrentUserId(), req);
     }
 
     // ── [6. 대시보드 전용 최적화 API] ──────────────────────────────────────────
