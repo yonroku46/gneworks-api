@@ -70,6 +70,14 @@
     from site
     where name = #{name,jdbcType=VARCHAR}
     and address = #{address,jdbcType=VARCHAR}
+    <choose>
+      <when test="regionId != null and regionId != ''">
+        and region_id = #{regionId,jdbcType=CHAR}
+      </when>
+      <otherwise>
+        and (region_id is null or region_id = '')
+      </otherwise>
+    </choose>
     limit 1
   </select>
 

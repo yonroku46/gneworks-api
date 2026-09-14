@@ -220,12 +220,12 @@ public class ExcelImportService {
                 }
 
                 // ── 1. SITE 처리 ──────────────────────────────
-                String cacheKey = aptName + "||" + address;
+                String cacheKey = (finalRegionId != null ? finalRegionId : "") + "||" + aptName + "||" + address;
                 String siteId = siteCache.get(cacheKey);
 
                 if (siteId == null) {
-                    // DB에서 중복 확인
-                    Site existing = siteDao.selectSiteByNameAndAddress(aptName, address);
+                    // DB에서 중복 확인 (선택한 관할 지역 내 중복 여부 확인)
+                    Site existing = siteDao.selectSiteByNameAndAddress(aptName, address, finalRegionId);
                     if (existing != null) {
                         siteId = existing.getSiteId();
                         siteSkipped++;

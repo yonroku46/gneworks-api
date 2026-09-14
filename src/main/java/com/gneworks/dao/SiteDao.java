@@ -129,13 +129,18 @@ public class SiteDao {
     }
 
     public Site selectSiteByNameAndAddress(String name, String address) {
+        return selectSiteByNameAndAddress(name, address, null);
+    }
+
+    public Site selectSiteByNameAndAddress(String name, String address, String regionId) {
         try {
-            return siteMapper.selectByNameAndAddress(name, address);
+            return siteMapper.selectByNameAndAddress(name, address, regionId);
         } catch (Exception exception) {
             final String methodName = "SiteMapper#selectByNameAndAddress";
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("name", name);
             paramMap.put("address", address);
+            paramMap.put("regionId", regionId);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
             log.error(overview + detail);

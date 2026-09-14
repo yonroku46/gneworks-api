@@ -12,7 +12,7 @@ public interface SiteMapper {
 
     Site selectByPrimaryKey(String siteId);
 
-    Site selectByNameAndAddress(@Param("name") String name, @Param("address") String address);
+    Site selectByNameAndAddress(@Param("name") String name, @Param("address") String address, @Param("regionId") String regionId);
 
     List<Site> selectAll();
 
