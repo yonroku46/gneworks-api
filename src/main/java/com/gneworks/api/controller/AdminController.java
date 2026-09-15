@@ -94,7 +94,7 @@ public class AdminController extends BaseController {
     }
 
     /**
-     * 계정 비활성화(삭제)
+     * 계정 영구 삭제
      * DELETE /admin/user/{userId}
      */
     @DeleteMapping("/user/{userId}")

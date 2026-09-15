@@ -319,7 +319,7 @@ public class AdminService {
     }
 
     /**
-     * 계정 비활성화(소프트 삭제, delete_flg = 1)
+     * 계정 영구 완전 삭제 (하드 삭제)
      */
     @Transactional
     public BaseResponse deleteUser(String operatorUserId, String targetUserId) {
@@ -336,7 +336,7 @@ public class AdminService {
             return ResponseUtils.generateDtoFailed(new Information(MessageIdConst.E_USER_NOT_FOUND, "USER_NOT_FOUND"));
         }
 
-        userDao.softDeleteUser(user.getUserId());
+        userDao.deleteUser(user.getUserId());
 
         ActionRes res = new ActionRes(user.getUserId());
         return ResponseUtils.generateDtoSuccess(
