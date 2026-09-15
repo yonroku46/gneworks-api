@@ -9,6 +9,8 @@ public class UserAssignedRegionDetailRes extends ResponseData {
     private String sido;
     private String sigungu;
     private String assignedDate;
+    private Long totalSites;
+    private Long totalHouseholds;
 
     public String getAssignedRegionId() { return assignedRegionId; }
     public void setAssignedRegionId(String assignedRegionId) { this.assignedRegionId = assignedRegionId; }
@@ -22,4 +24,8 @@ public class UserAssignedRegionDetailRes extends ResponseData {
     public void setSigungu(String sigungu) { this.sigungu = sigungu; }
     public String getAssignedDate() { return assignedDate; }
     public void setAssignedDate(String assignedDate) { this.assignedDate = assignedDate; }
+    public Long getTotalSites() { return totalSites; }
+    public void setTotalSites(Long totalSites) { this.totalSites = totalSites; }
+    public Long getTotalHouseholds() { return totalHouseholds; }
+    public void setTotalHouseholds(Long totalHouseholds) { this.totalHouseholds = totalHouseholds; }
 }

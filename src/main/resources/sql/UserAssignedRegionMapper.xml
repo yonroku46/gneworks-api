@@ -34,6 +34,8 @@
     <result column="sido" property="sido" />
     <result column="sigungu" property="sigungu" />
     <result column="assigned_date" property="assignedDate" />
+    <result column="total_sites" property="totalSites" />
+    <result column="total_households" property="totalHouseholds" />
   </resultMap>
 
   <insert id="insert" parameterType="com.gneworks.dao.entity.UserAssignedRegion">
@@ -61,7 +63,7 @@
     from user_assigned_region
   </select>
 
-  <!-- 특정 작업자의 배정 관할 목록 조회 -->
+  <!-- 특정 작업자의 배정 관할 목록 조회 (현장수, 세대수 집계 포함) -->
   <select id="selectAssignedRegionsByUserId" parameterType="java.lang.String" resultMap="UserAssignedRegionDetailResultMap">
     select 
       uar.assigned_region_id,
@@ -69,10 +71,15 @@
       uar.region_id,
       fr.sido_name as sido,
       fr.name as sigungu,
-      date_format(uar.create_time, '%Y.%m.%d') as assigned_date
+      date_format(uar.create_time, '%Y.%m.%d') as assigned_date,
+      count(distinct s.site_id) as total_sites,
+      count(distinct h.household_id) as total_households
     from user_assigned_region uar
     inner join fire_region fr on uar.region_id = fr.region_id
+    left join site s on uar.region_id = s.region_id
+    left join household h on s.site_id = h.site_id
     where uar.user_id = #{userId}
+    group by uar.assigned_region_id, uar.user_id, uar.region_id, fr.sido_name, fr.name, uar.create_time
     order by uar.create_time asc
   </select>
 

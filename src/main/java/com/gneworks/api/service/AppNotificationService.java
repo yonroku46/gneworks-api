@@ -62,7 +62,12 @@ public class AppNotificationService {
 
     @Transactional(readOnly = true)
     public BaseResponse getNotifications(String userId) {
-        List<AppNotification> list = appNotificationDao.selectByUserId(userId);
+        return getNotifications(userId, 30);
+    }
+
+    @Transactional(readOnly = true)
+    public BaseResponse getNotifications(String userId, Integer limit) {
+        List<AppNotification> list = appNotificationDao.selectByUserId(userId, limit);
         return ResponseUtils.generateDtoSuccess(new Information(MessageIdConst.I_GETTING_SUCCESS,
                 messageSource.getMessage(MessageIdConst.I_GETTING_SUCCESS, new String[] { "AppNotification" }, LocaleAspect.LOCALE)), new ListRes<>(list));
     }

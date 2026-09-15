@@ -65,7 +65,7 @@
     select app_notification_id, user_id, title, is_read, icon_type, create_time, message
     from app_notification
   </select>
-  <select id="selectByUserId" parameterType="java.lang.String" resultMap="BaseResultMap">
+  <select id="selectByUserId" resultMap="BaseResultMap">
     select
       app_notification_id, user_id, title, is_read, icon_type, message, create_time
     from
@@ -74,7 +74,14 @@
       user_id = #{userId,jdbcType=CHAR}
     order by
       create_time desc
-    limit 30
+    <choose>
+      <when test="limit != null and limit > 0">
+        limit #{limit}
+      </when>
+      <otherwise>
+        limit 30
+      </otherwise>
+    </choose>
   </select>
   <update id="updateAllAsReadByUserId" parameterType="java.lang.String">
     update app_notification

@@ -26,12 +26,17 @@ public class AppNotificationDao {
     private AppNotificationMapper appNotificationMapper;
 
     public List<AppNotification> selectByUserId(String userId) {
+        return selectByUserId(userId, 30);
+    }
+
+    public List<AppNotification> selectByUserId(String userId, Integer limit) {
         try {
-            return appNotificationMapper.selectByUserId(userId);
+            return appNotificationMapper.selectByUserId(userId, limit != null && limit > 0 ? limit : 30);
         } catch (Exception exception) {
             final String methodName = "AppNotificationMapper#selectByUserId";
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("userId", userId);
+            paramMap.put("limit", limit);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
             log.error(overview + detail);

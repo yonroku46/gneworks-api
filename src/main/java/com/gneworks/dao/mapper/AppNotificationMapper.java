@@ -2,6 +2,8 @@ package com.gneworks.dao.mapper;
 
 import com.gneworks.dao.entity.AppNotification;
 import jakarta.annotation.Generated;
+import org.apache.ibatis.annotations.Param;
+
 import java.util.List;
 
 public interface AppNotificationMapper {
@@ -20,7 +22,7 @@ public interface AppNotificationMapper {
     @Generated("org.mybatis.generator.api.MyBatisGenerator")
     int updateByPrimaryKey(AppNotification row);
 
-    List<AppNotification> selectByUserId(String userId);
+    List<AppNotification> selectByUserId(@Param("userId") String userId, @Param("limit") Integer limit);
 
     int updateAllAsReadByUserId(String userId);
 }

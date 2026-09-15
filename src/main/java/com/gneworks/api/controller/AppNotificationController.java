@@ -39,8 +39,8 @@ public class AppNotificationController extends BaseController {
     }
 
     @GetMapping("/list")
-    public BaseResponse getNotifications() {
-        return appNotificationService.getNotifications(getCurrentUserId());
+    public BaseResponse getNotifications(@RequestParam(value = "limit", required = false, defaultValue = "30") Integer limit) {
+        return appNotificationService.getNotifications(getCurrentUserId(), limit);
     }
 
     @PatchMapping("/read")
