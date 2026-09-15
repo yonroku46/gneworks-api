@@ -61,6 +61,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -945,15 +947,30 @@ public class AdminService {
 
         inquiryDao.updateByPrimaryKey(inq);
 
-        // 문의 작성자(작업자)에게 실시간 SSE 및 웹 푸시 알림 발송
+        // 문의 작성자(작업자)에게 실시간 SSE 및 웹 푸시 알림 발송 (트랜잭션 커밋 완료 후 발송)
         if (inq.getUserId() != null && !inq.getUserId().trim().isEmpty()) {
-            try {
-                String inqType = InquiryType.toLabel(inq.getInquiryType());
-                String title = "문의사항 답변 등록";
-                String message = String.format("[%s] 문의하신 사항에 답변이 등록되었습니다.", inqType);
-                appNotificationService.sendNotificationToUser(inq.getUserId().trim(), title, message, "/portal", "LOGO");
-            } catch (Exception e) {
-                log.error("Failed to notify user of inquiry answer: {}", e.getMessage());
+            final String targetUserId = inq.getUserId().trim();
+            final String inqType = InquiryType.toLabel(inq.getInquiryType());
+            final String title = "문의사항 답변 등록";
+            final String message = String.format("[%s] 문의하신 사항에 답변이 등록되었습니다.", inqType);
+
+            Runnable sendNotificationTask = () -> {
+                try {
+                    appNotificationService.sendNotificationToUser(targetUserId, title, message, "/portal", "LOGO");
+                } catch (Exception e) {
+                    log.error("Failed to notify user of inquiry answer: {}", e.getMessage());
+                }
+            };
+
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        sendNotificationTask.run();
+                    }
+                });
+            } else {
+                sendNotificationTask.run();
             }
         }
 
@@ -1170,22 +1187,37 @@ public class AdminService {
             }
         }
 
-        // 상태 변경(확인완료 또는 반려) 시 작업자에게 실시간 SSE 및 웹 푸시 알림 발송
+        // 상태 변경(확인완료 또는 반려) 시 작업자에게 실시간 SSE 및 웹 푸시 알림 발송 (트랜잭션 커밋 완료 후 안전하게 발송)
         if (existing.getUserId() != null && !existing.getUserId().trim().isEmpty() && ("COMPLETED".equals(newStatus) || "REJECTED".equals(newStatus))) {
-            try {
-                boolean isApproved = "COMPLETED".equals(newStatus);
-                String title = isApproved ? "작업 보고서 확인완료" : "작업 보고서 반려";
-                String siteName = existing.getSiteName() != null ? existing.getSiteName() : "현장";
-                String statusText = isApproved ? "확인완료(승인)" : "반려";
-                String message = String.format("[%s %s동 %s호] 작업 보고서가 %s되었습니다.%s",
-                        siteName,
-                        existing.getDong() != null ? existing.getDong() : "",
-                        existing.getHo() != null ? existing.getHo() : "",
-                        statusText,
-                        (!isApproved && !fixReason.isEmpty()) ? " (사유: " + fixReason + ")" : "");
-                appNotificationService.sendNotificationToUser(existing.getUserId().trim(), title, message, "/portal", "LOGO");
-            } catch (Exception e) {
-                log.error("Failed to notify worker of report status change: {}", e.getMessage());
+            final String targetUserId = existing.getUserId().trim();
+            final boolean isApproved = "COMPLETED".equals(newStatus);
+            final String title = isApproved ? "작업 보고서 확인완료" : "작업 보고서 반려";
+            final String siteName = existing.getSiteName() != null ? existing.getSiteName() : "현장";
+            final String statusText = isApproved ? "확인완료(승인)" : "반려";
+            final String message = String.format("[%s %s동 %s호] 작업 보고서가 %s되었습니다.%s",
+                    siteName,
+                    existing.getDong() != null ? existing.getDong() : "",
+                    existing.getHo() != null ? existing.getHo() : "",
+                    statusText,
+                    (!isApproved && !fixReason.isEmpty()) ? " (사유: " + fixReason + ")" : "");
+
+            Runnable sendNotificationTask = () -> {
+                try {
+                    appNotificationService.sendNotificationToUser(targetUserId, title, message, "/portal", "LOGO");
+                } catch (Exception e) {
+                    log.error("Failed to notify worker of report status change: {}", e.getMessage());
+                }
+            };
+
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        sendNotificationTask.run();
+                    }
+                });
+            } else {
+                sendNotificationTask.run();
             }
         }
 

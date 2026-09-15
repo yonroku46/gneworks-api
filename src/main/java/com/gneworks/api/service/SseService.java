@@ -47,7 +47,7 @@ public class SseService {
             removeEmitter.run();
         });
         emitter.onError((e) -> {
-            log.error("SSE connection error for user: {}: {}", userId, e.getMessage());
+            log.debug("SSE connection error for user: {}: {}", userId, e.getMessage());
             emitter.complete();
             removeEmitter.run();
         });
