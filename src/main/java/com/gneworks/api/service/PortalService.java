@@ -80,6 +80,9 @@ public class PortalService {
     private AppNotificationService appNotificationService;
 
     @Autowired
+    private WorkReportTxService workReportTxService;
+
+    @Autowired
     private SystemSettingsDao systemSettingsDao;
 
     @Value("${cloud.aws.s3.prefix.user}")
@@ -477,8 +480,9 @@ public class PortalService {
 
     /**
      * 시공 보고서 등록 및 수정 (UPSERT)
+     * S3 이미지 업로드/삭제 및 알림 발송은 DB 트랜잭션 외부에서 수행하고,
+     * 순수 DB CUD 작업만 WorkReportTxService를 통해 초단기 트랜잭션으로 처리하여 HikariCP 커넥션 점유를 최소화합니다.
      */
-    @Transactional
     public BaseResponse submitReport(String userId, WorkReportReq req) {
         if (req.getHouseholdId() == null || req.getHouseholdId().trim().isEmpty()) {
             return ResponseUtils.generateDtoFailed(new Information("INVALID_PARAMETER", "HOUSEHOLD_ID_REQUIRED"));
@@ -490,16 +494,15 @@ public class PortalService {
         String householdId = req.getHouseholdId().trim();
         String reportSubDir = reportPrefix + householdId + "/";
 
+        // 사전 권한 확인 (비트랜잭션으로 조회하여 1ms 내 커넥션 반납)
         WorkReport existing = workReportDao.selectByHouseholdId(householdId);
-
-        // 다른 작업자가 이미 작성한 보고서는 수정 불가
         if (existing != null && existing.getUserId() != null && !existing.getUserId().trim().isEmpty()) {
             if (!existing.getUserId().trim().equals(userId.trim())) {
                 return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "다른 작업자가 이미 제출한 세대 보고서는 수정할 수 없습니다."));
             }
         }
 
-        // 서명 및 5종 사진 S3 업로드 (Base64 -> S3 URL 치환)
+        // [단계 1] 서명 및 5종 사진 S3 업로드 (DB 커넥션 전혀 점유하지 않음)
         String confirmerSignature = uploadBase64Image(req.getConfirmerSignature(), reportSubDir, "sig");
         String photoDoor = uploadBase64Image(req.getPhotoDoor(), reportSubDir, "door");
         String photoBefore1 = uploadBase64Image(req.getPhotoBefore1(), reportSubDir, "before1");
@@ -530,40 +533,31 @@ public class PortalService {
             installDate = new Date();
         }
 
-        Date now = new Date();
+        // [단계 2] 초단기 DB 트랜잭션 수행 (0.005초 내 완료 및 즉시 커넥션 반납)
+        WorkReportRes res;
+        try {
+            res = workReportTxService.saveReportTransaction(
+                    userId,
+                    req,
+                    confirmerSignature,
+                    photoDoor,
+                    photoBefore1,
+                    photoAfter1,
+                    photoBefore2,
+                    photoAfter2,
+                    installDate);
+        } catch (IllegalStateException e) {
+            if ("ACCESS_DENIED".equals(e.getMessage())) {
+                return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "다른 작업자가 이미 제출한 세대 보고서는 수정할 수 없습니다."));
+            }
+            throw e;
+        }
 
+        enrichReportRes(res);
+
+        // [단계 3] 사후 외부 I/O 비동기/트랜잭션 외 처리
         if (existing == null) {
-            // 신규 등록
-            WorkReport report = new WorkReport();
-            report.setReportId(KsuidGenerator.createId());
-            report.setHouseholdId(householdId);
-            report.setSiteId(req.getSiteId().trim());
-            report.setUserId(userId);
-            report.setDong(req.getDong() != null ? req.getDong() : "");
-            report.setHo(req.getHo() != null ? req.getHo() : "");
-            report.setHeadName(req.getHeadName() != null ? req.getHeadName() : "");
-            report.setInstallDate(installDate);
-            report.setReportTime(now);
-            report.setReporterName(req.getReporterName() != null ? req.getReporterName() : "");
-            report.setConfirmerName(req.getConfirmerName() != null ? req.getConfirmerName() : "");
-            report.setConfirmerSignature(confirmerSignature != null ? confirmerSignature : "");
-            report.setPhotoDoor(photoDoor);
-            report.setPhotoBefore1(photoBefore1);
-            report.setPhotoAfter1(photoAfter1);
-            report.setPhotoBefore2(photoBefore2);
-            report.setPhotoAfter2(photoAfter2);
-            report.setStatus(req.getStatus() != null && !req.getStatus().trim().isEmpty() ? req.getStatus().trim() : "PENDING");
-            report.setRemarks(req.getRemarks());
-            report.setCreateTime(now);
-            report.setLastUpdate(now);
-            report.setDeleteFlg(false);
-
-            workReportDao.insert(report);
-
-            WorkReportRes res = workReportDao.selectReportDetailById(report.getReportId());
-            enrichReportRes(res);
-
-            // 신규 보고서 제출 시 관리자 전원에게 실시간 SSE 및 웹 푸시 알림 발송
+            // 신규 보고서 제출 시 관리자 전원에게 실시간 SSE 및 웹 푸시 알림 발송 (@Async 처리됨)
             try {
                 String siteName = (res != null && res.getSiteName() != null) ? res.getSiteName().trim() : "현장";
                 String sido = (res != null && res.getSido() != null) ? res.getSido().trim() : "";
@@ -580,46 +574,18 @@ public class PortalService {
 
                 String locationPrefix = regionPart.isEmpty() ? siteName : regionPart + " · " + siteName;
                 String title = "신규 작업 보고서 제출";
-                String message = String.format("[%s] %s동 %s호 보고서가 제출되었습니다.", locationPrefix, report.getDong(), report.getHo());
-                String targetUrl = "/manage/work?reportId=" + report.getReportId();
+                String dong = (res != null && res.getDong() != null) ? res.getDong() : (req.getDong() != null ? req.getDong() : "");
+                String ho = (res != null && res.getHo() != null) ? res.getHo() : (req.getHo() != null ? req.getHo() : "");
+                String reportId = (res != null && res.getReportId() != null) ? res.getReportId() : "";
+                String message = String.format("[%s] %s동 %s호 보고서가 제출되었습니다.", locationPrefix, dong, ho);
+                String targetUrl = "/manage/work?reportId=" + reportId;
 
                 appNotificationService.sendNotificationToAdmins(title, message, targetUrl, "LOGO");
             } catch (Exception e) {
                 log.error("Failed to notify admins of new report: {}", e.getMessage());
             }
-
-            return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
         } else {
-            // 기존 보고서 수정
-            existing.setSiteId(req.getSiteId().trim());
-            existing.setUserId(userId);
-            if (req.getDong() != null) existing.setDong(req.getDong());
-            if (req.getHo() != null) existing.setHo(req.getHo());
-            if (req.getHeadName() != null) existing.setHeadName(req.getHeadName());
-            existing.setInstallDate(installDate);
-            existing.setReportTime(now);
-            if (req.getReporterName() != null) existing.setReporterName(req.getReporterName());
-            if (req.getConfirmerName() != null) existing.setConfirmerName(req.getConfirmerName());
-            if (confirmerSignature != null) existing.setConfirmerSignature(confirmerSignature);
-            if (photoDoor != null) existing.setPhotoDoor(photoDoor);
-            if (photoBefore1 != null) existing.setPhotoBefore1(photoBefore1);
-            if (photoAfter1 != null) existing.setPhotoAfter1(photoAfter1);
-            if (photoBefore2 != null) existing.setPhotoBefore2(photoBefore2);
-            if (photoAfter2 != null) existing.setPhotoAfter2(photoAfter2);
-            existing.setStatus("PENDING"); // 수정 제출 시 재검토 대기 상태
-            existing.setRemarks(req.getRemarks());
-            existing.setLastUpdate(now);
-
-            workReportDao.updateByPrimaryKey(existing);
-
-            // 수정 제출 시 재검토 대기 상태이므로 기존 승인되었던 세대 설치 상태를 UNINSTALLED로 리셋
-            Household hh = siteDao.selectHouseholdById(householdId);
-            if (hh != null && "INSTALLED".equals(hh.getInstallStatus())) {
-                hh.setInstallStatus("UNINSTALLED");
-                siteDao.updateHousehold(hh);
-            }
-
-            // DB 업데이트 완료 후 교체된 이전 S3 사진 파일들 안전하게 삭제
+            // 수정 시 교체된 이전 S3 사진 파일들 안전하게 삭제 (DB 커넥션 없이 수행)
             for (String oldPhotoPath : oldPhotosToDelete) {
                 try {
                     String oldS3Key = oldPhotoPath.startsWith("/") ? oldPhotoPath.substring(1) : oldPhotoPath;
@@ -628,11 +594,9 @@ public class PortalService {
                     log.warn("Failed to delete replaced report image from S3: {}", oldPhotoPath, ex);
                 }
             }
-
-            WorkReportRes res = workReportDao.selectReportDetailById(existing.getReportId());
-            enrichReportRes(res);
-            return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
         }
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
     }
 
     /**

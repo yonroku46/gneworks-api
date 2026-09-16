@@ -25,6 +25,7 @@ import com.gneworks.dto.res.core.Information;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -263,7 +264,7 @@ public class AppNotificationService {
     /**
      * 특정 사용자에게 통합 알림 발송 (DB 저장 + SSE + Web Push)
      */
-    @Transactional
+    @Async
     public void sendNotificationToUser(String userId, String title, String message, String url, String iconType) {
         if (userId == null || userId.isBlank()) return;
 
@@ -330,7 +331,7 @@ public class AppNotificationService {
     /**
      * 관리자 전원에게 통합 알림 발송 (모든 관리자 DB 저장 + SSE + 모든 관리자 기기 Web Push)
      */
-    @Transactional
+    @Async
     public void sendNotificationToAdmins(String title, String message, String url, String iconType) {
         // 1. 모든 관리자(role_id = 9) DB 저장 및 SSE 전송
         try {
