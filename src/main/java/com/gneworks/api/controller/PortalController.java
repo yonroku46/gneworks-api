@@ -99,9 +99,11 @@ public class PortalController extends BaseController {
     public BaseResponse getSites(
             @RequestParam(value = "regionId", required = false) String regionId,
             @RequestParam(value = "query", required = false) String query,
+            @RequestParam(value = "page", required = false) Integer page,
+            @RequestParam(value = "size", required = false) Integer size,
             @RequestParam(value = "limit", required = false) Integer limit,
             @RequestParam(value = "includeHouseholds", required = false, defaultValue = "false") Boolean includeHouseholds) {
-        return portalService.getSites(getCurrentUserId(), regionId, query, limit, includeHouseholds);
+        return portalService.getSites(getCurrentUserId(), regionId, query, page, size != null ? size : limit, includeHouseholds);
     }
 
     /**

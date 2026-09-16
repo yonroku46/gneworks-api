@@ -340,10 +340,10 @@ public class PortalService {
     }
 
     /**
-     * 현장 목록 조회 (세대 목록 포함 여부 선택 가능 - 작업자 본인 배정 관할 기반 필터링)
+     * 현장 목록 조회 (세대 목록 포함 여부 및 page/size 페이징 지원 - 작업자 본인 배정 관할 기반 필터링)
      */
     @Transactional(readOnly = true)
-    public BaseResponse getSites(String userId, String regionId, String query, Integer limit, Boolean includeHouseholds) {
+    public BaseResponse getSites(String userId, String regionId, String query, Integer page, Integer size, Boolean includeHouseholds) {
         List<String> targetRegionIds = null;
 
         // 특정 regionId가 주어지지 않은 경우 작업자의 배정 관할로 한정
@@ -367,10 +367,19 @@ public class PortalService {
             }
         }
 
-        List<AdminSiteRes> list = siteDao.selectSiteList(regionId, targetRegionIds, query, limit, null);
-        long totalCount = limit != null
-                ? siteDao.selectSiteListCount(regionId, targetRegionIds, query)
-                : (list != null ? list.size() : 0);
+        List<AdminSiteRes> list;
+        long totalCount;
+
+        if (page != null && page > 0 && size != null && size > 0) {
+            list = siteDao.selectSiteListPaged(regionId, targetRegionIds, query, page, size);
+            totalCount = siteDao.selectSiteListCount(regionId, targetRegionIds, query);
+        } else {
+            list = siteDao.selectSiteList(regionId, targetRegionIds, query, size, null);
+            totalCount = size != null
+                    ? siteDao.selectSiteListCount(regionId, targetRegionIds, query)
+                    : (list != null ? list.size() : 0);
+        }
+
         if (list == null) {
             list = new ArrayList<>();
         }
@@ -387,8 +396,12 @@ public class PortalService {
         return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(list, (int) totalCount));
     }
 
+    public BaseResponse getSites(String userId, String regionId, String query, Integer limit, Boolean includeHouseholds) {
+        return getSites(userId, regionId, query, null, limit, includeHouseholds);
+    }
+
     public BaseResponse getSites(String regionId, String query, Integer limit, Boolean includeHouseholds) {
-        return getSites(null, regionId, query, limit, includeHouseholds);
+        return getSites(null, regionId, query, null, limit, includeHouseholds);
     }
 
     /**
