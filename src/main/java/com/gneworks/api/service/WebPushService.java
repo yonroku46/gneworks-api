@@ -9,6 +9,7 @@ import nl.martijndwars.webpush.Subscription;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.security.Security;
@@ -52,6 +53,7 @@ public class WebPushService {
         return publicKey;
     }
 
+    @Async
     public boolean sendPushNotification(String endpoint, String p256dh, String auth, String payload) {
         if (pushService == null) {
             log.error("PushService is not initialized. Cannot send push notification.");

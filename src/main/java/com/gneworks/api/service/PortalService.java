@@ -340,13 +340,36 @@ public class PortalService {
     }
 
     /**
-     * 현장 목록 조회 (세대 목록 포함 여부 선택 가능)
+     * 현장 목록 조회 (세대 목록 포함 여부 선택 가능 - 작업자 본인 배정 관할 기반 필터링)
      */
     @Transactional(readOnly = true)
-    public BaseResponse getSites(String regionId, String query, Integer limit, Boolean includeHouseholds) {
-        List<AdminSiteRes> list = siteDao.selectSiteList(regionId, query, limit, null);
+    public BaseResponse getSites(String userId, String regionId, String query, Integer limit, Boolean includeHouseholds) {
+        List<String> targetRegionIds = null;
+
+        // 특정 regionId가 주어지지 않은 경우 작업자의 배정 관할로 한정
+        if (regionId == null || regionId.trim().isEmpty()) {
+            if (userId != null && !userId.trim().isEmpty()) {
+                User user = userDao.findUser(userId);
+                boolean isAdmin = user != null && user.getRoleId() != null && user.getRoleId() == 9;
+                if (!isAdmin) {
+                    List<UserAssignedRegionDetailRes> assigned = siteDao.selectAssignedRegionsByUserId(userId);
+                    if (assigned == null || assigned.isEmpty()) {
+                        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(Collections.emptyList(), 0));
+                    }
+                    targetRegionIds = assigned.stream()
+                            .map(UserAssignedRegionDetailRes::getRegionId)
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toList());
+                    if (targetRegionIds.isEmpty()) {
+                        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(Collections.emptyList(), 0));
+                    }
+                }
+            }
+        }
+
+        List<AdminSiteRes> list = siteDao.selectSiteList(regionId, targetRegionIds, query, limit, null);
         long totalCount = limit != null
-                ? siteDao.selectSiteListCount(regionId, query)
+                ? siteDao.selectSiteListCount(regionId, targetRegionIds, query)
                 : (list != null ? list.size() : 0);
         if (list == null) {
             list = new ArrayList<>();
@@ -362,6 +385,10 @@ public class PortalService {
         }
 
         return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ListRes<>(list, (int) totalCount));
+    }
+
+    public BaseResponse getSites(String regionId, String query, Integer limit, Boolean includeHouseholds) {
+        return getSites(null, regionId, query, limit, includeHouseholds);
     }
 
     /**

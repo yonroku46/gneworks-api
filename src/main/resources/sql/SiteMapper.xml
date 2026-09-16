@@ -133,7 +133,7 @@
     left join fire_region fr on s.region_id = fr.region_id
   </select>
 
-  <!-- 현장 목록 조회 (필터 및 동수, 세대수 집계) -->
+  <!-- 현장 목록 조회 (필터 및 동수, 세대수 집계 - 인라인 뷰 사전 집계로 3중 조인 제거) -->
   <select id="selectSiteList" resultMap="SiteListResultMap">
     select 
       s.site_id, s.region_id, s.name, 
@@ -142,25 +142,39 @@
       coalesce(fr.sido_name, s.sido) as sido, 
       s.sigungu, s.eupmyeondong,
       s.contact_phone, s.create_time,
-      count(distinct h.household_id) as total_households,
-      count(distinct h.dong) as dong_count,
-      count(distinct case when wr.status = 'COMPLETED' then h.household_id end) as completed_households
+      coalesce(h_stat.total_households, 0) as total_households,
+      coalesce(h_stat.dong_count, 0) as dong_count,
+      coalesce(wr_stat.completed_households, 0) as completed_households
     from site s
     left join fire_region fr on s.region_id = fr.region_id
-    left join household h on s.site_id = h.site_id
-    left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0 and wr.status = 'COMPLETED'
+    left join (
+      select site_id, count(*) as total_households, count(distinct dong) as dong_count
+      from household
+      group by site_id
+    ) h_stat on s.site_id = h_stat.site_id
+    left join (
+      select site_id, count(distinct household_id) as completed_households
+      from work_report
+      where delete_flg = 0 and status = 'COMPLETED' and household_id is not null and household_id != ''
+      group by site_id
+    ) wr_stat on s.site_id = wr_stat.site_id
     <where>
       <if test="regionId != null and regionId != ''">
         and s.region_id = #{regionId}
+      </if>
+      <if test="regionIds != null and !regionIds.isEmpty()">
+        and s.region_id in
+        <foreach item="item" collection="regionIds" open="(" separator="," close=")">
+          #{item}
+        </foreach>
       </if>
       <if test="query != null and query != ''">
         and (s.name like concat('%', #{query}, '%') or s.address like concat('%', #{query}, '%'))
       </if>
     </where>
-    group by s.site_id, fr.name, fr.sido_name
     <choose>
       <when test="orderBy == 'RATE_DESC'">
-        order by (case when count(distinct h.household_id) > 0 then count(distinct case when wr.status = 'COMPLETED' then h.household_id end) * 1.0 / count(distinct h.household_id) else 0 end) desc, s.create_time desc
+        order by (case when coalesce(h_stat.total_households, 0) &gt; 0 then coalesce(wr_stat.completed_households, 0) * 1.0 / h_stat.total_households else 0 end) desc, s.create_time desc
       </when>
       <otherwise>
         order by s.create_time desc
@@ -171,7 +185,7 @@
     </if>
   </select>
 
-  <!-- 현장 목록 페이징 조회 (대용량 데이터 대응: 서브쿼리로 LIMIT 후 조인) -->
+  <!-- 현장 목록 페이징 조회 (대용량 데이터 대응: 서브쿼리로 LIMIT 후 사전 집계 조인) -->
   <select id="selectSiteListPaged" resultMap="SiteListResultMap">
     select 
       s.site_id, s.region_id, s.name, 
@@ -180,15 +194,21 @@
       coalesce(fr.sido_name, s.sido) as sido, 
       s.sigungu, s.eupmyeondong,
       s.contact_phone, s.create_time,
-      count(distinct h.household_id) as total_households,
-      count(distinct h.dong) as dong_count,
-      count(distinct case when wr.status = 'COMPLETED' then h.household_id end) as completed_households
+      coalesce(h_stat.total_households, 0) as total_households,
+      coalesce(h_stat.dong_count, 0) as dong_count,
+      coalesce(wr_stat.completed_households, 0) as completed_households
     from (
       select site_id, region_id, name, region, address, sido, sigungu, eupmyeondong, contact_phone, create_time
       from site
       <where>
         <if test="regionId != null and regionId != ''">
           and region_id = #{regionId}
+        </if>
+        <if test="regionIds != null and !regionIds.isEmpty()">
+          and region_id in
+          <foreach item="item" collection="regionIds" open="(" separator="," close=")">
+            #{item}
+          </foreach>
         </if>
         <if test="query != null and query != ''">
           and (name like concat('%', #{query}, '%') or address like concat('%', #{query}, '%'))
@@ -198,9 +218,17 @@
       limit #{size} offset #{offset}
     ) s
     left join fire_region fr on s.region_id = fr.region_id
-    left join household h on s.site_id = h.site_id
-    left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0 and wr.status = 'COMPLETED'
-    group by s.site_id, fr.name, fr.sido_name
+    left join (
+      select site_id, count(*) as total_households, count(distinct dong) as dong_count
+      from household
+      group by site_id
+    ) h_stat on s.site_id = h_stat.site_id
+    left join (
+      select site_id, count(distinct household_id) as completed_households
+      from work_report
+      where delete_flg = 0 and status = 'COMPLETED' and household_id is not null and household_id != ''
+      group by site_id
+    ) wr_stat on s.site_id = wr_stat.site_id
     order by s.create_time desc
   </select>
 
@@ -211,6 +239,12 @@
     <where>
       <if test="regionId != null and regionId != ''">
         and region_id = #{regionId}
+      </if>
+      <if test="regionIds != null and !regionIds.isEmpty()">
+        and region_id in
+        <foreach item="item" collection="regionIds" open="(" separator="," close=")">
+          #{item}
+        </foreach>
       </if>
       <if test="query != null and query != ''">
         and (name like concat('%', #{query}, '%') or address like concat('%', #{query}, '%'))

@@ -47,16 +47,21 @@ public class SiteDao {
     // ── [1. Site] ───────────────────────────────────────────
 
     public List<AdminSiteRes> selectSiteList(String regionId, String query) {
-        return selectSiteList(regionId, query, null, null);
+        return selectSiteList(regionId, null, query, null, null);
     }
 
     public List<AdminSiteRes> selectSiteList(String regionId, String query, Integer limit, String orderBy) {
+        return selectSiteList(regionId, null, query, limit, orderBy);
+    }
+
+    public List<AdminSiteRes> selectSiteList(String regionId, List<String> regionIds, String query, Integer limit, String orderBy) {
         try {
-            return siteMapper.selectSiteList(regionId, query, limit, orderBy);
+            return siteMapper.selectSiteList(regionId, regionIds, query, limit, orderBy);
         } catch (Exception exception) {
             final String methodName = "SiteMapper#selectSiteList";
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("regionId", regionId);
+            paramMap.put("regionIds", regionIds);
             paramMap.put("query", query);
             paramMap.put("limit", limit);
             paramMap.put("orderBy", orderBy);
@@ -68,13 +73,18 @@ public class SiteDao {
     }
 
     public List<AdminSiteRes> selectSiteListPaged(String regionId, String query, int page, int size) {
+        return selectSiteListPaged(regionId, null, query, page, size);
+    }
+
+    public List<AdminSiteRes> selectSiteListPaged(String regionId, List<String> regionIds, String query, int page, int size) {
         try {
             int offset = Math.max(0, (page - 1) * size);
-            return siteMapper.selectSiteListPaged(regionId, query, offset, size);
+            return siteMapper.selectSiteListPaged(regionId, regionIds, query, offset, size);
         } catch (Exception exception) {
             final String methodName = "SiteMapper#selectSiteListPaged";
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("regionId", regionId);
+            paramMap.put("regionIds", regionIds);
             paramMap.put("query", query);
             paramMap.put("page", page);
             paramMap.put("size", size);
@@ -86,12 +96,17 @@ public class SiteDao {
     }
 
     public long selectSiteListCount(String regionId, String query) {
+        return selectSiteListCount(regionId, null, query);
+    }
+
+    public long selectSiteListCount(String regionId, List<String> regionIds, String query) {
         try {
-            return siteMapper.selectSiteListCount(regionId, query);
+            return siteMapper.selectSiteListCount(regionId, regionIds, query);
         } catch (Exception exception) {
             final String methodName = "SiteMapper#selectSiteListCount";
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("regionId", regionId);
+            paramMap.put("regionIds", regionIds);
             paramMap.put("query", query);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);

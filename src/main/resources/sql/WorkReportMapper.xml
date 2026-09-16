@@ -197,10 +197,7 @@
     from work_report wr
     left join site s on wr.site_id = s.site_id
     left join fire_region fr on s.region_id = fr.region_id
-    left join household hh on (
-      (wr.household_id is not null and wr.household_id != '' and wr.household_id = hh.household_id)
-      or ((wr.household_id is null or wr.household_id = '') and wr.site_id = hh.site_id and wr.dong = hh.dong and wr.ho = hh.ho)
-    )
+    left join household hh on wr.household_id = hh.household_id
     where wr.delete_flg = 0
     <if test="regionId != null and regionId != ''">
       and s.region_id = #{regionId}
@@ -431,10 +428,7 @@
     from work_report wr
     left join site s on wr.site_id = s.site_id
     left join fire_region fr on s.region_id = fr.region_id
-    left join household hh on (
-      (wr.household_id is not null and wr.household_id != '' and wr.household_id = hh.household_id)
-      or ((wr.household_id is null or wr.household_id = '') and wr.site_id = hh.site_id and wr.dong = hh.dong and wr.ho = hh.ho)
-    )
+    left join household hh on wr.household_id = hh.household_id
     where wr.report_id = #{reportId} and wr.delete_flg = 0
     limit 1
   </select>
@@ -454,10 +448,7 @@
     from work_report wr
     left join site s on wr.site_id = s.site_id
     left join fire_region fr on s.region_id = fr.region_id
-    left join household hh on (
-      (wr.household_id is not null and wr.household_id != '' and wr.household_id = hh.household_id)
-      or ((wr.household_id is null or wr.household_id = '') and wr.site_id = hh.site_id and wr.dong = hh.dong and wr.ho = hh.ho)
-    )
+    left join household hh on wr.household_id = hh.household_id
     where wr.household_id = #{householdId} and wr.delete_flg = 0
     limit 1
   </select>

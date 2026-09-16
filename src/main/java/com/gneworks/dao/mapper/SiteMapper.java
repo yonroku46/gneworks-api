@@ -20,6 +20,7 @@ public interface SiteMapper {
 
     List<AdminSiteRes> selectSiteList(
         @Param("regionId") String regionId,
+        @Param("regionIds") List<String> regionIds,
         @Param("query") String query,
         @Param("limit") Integer limit,
         @Param("orderBy") String orderBy
@@ -27,6 +28,7 @@ public interface SiteMapper {
 
     List<AdminSiteRes> selectSiteListPaged(
         @Param("regionId") String regionId,
+        @Param("regionIds") List<String> regionIds,
         @Param("query") String query,
         @Param("offset") int offset,
         @Param("size") int size
@@ -34,6 +36,7 @@ public interface SiteMapper {
 
     long selectSiteListCount(
         @Param("regionId") String regionId,
+        @Param("regionIds") List<String> regionIds,
         @Param("query") String query
     );
 

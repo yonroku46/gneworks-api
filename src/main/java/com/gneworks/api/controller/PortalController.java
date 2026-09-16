@@ -101,7 +101,7 @@ public class PortalController extends BaseController {
             @RequestParam(value = "query", required = false) String query,
             @RequestParam(value = "limit", required = false) Integer limit,
             @RequestParam(value = "includeHouseholds", required = false, defaultValue = "false") Boolean includeHouseholds) {
-        return portalService.getSites(regionId, query, limit, includeHouseholds);
+        return portalService.getSites(getCurrentUserId(), regionId, query, limit, includeHouseholds);
     }
 
     /**
