@@ -488,7 +488,12 @@ public class PortalService {
             return ResponseUtils.generateDtoFailed(new Information("INVALID_PARAMETER", "HOUSEHOLD_ID_REQUIRED"));
         }
         if (req.getSiteId() == null || req.getSiteId().trim().isEmpty()) {
-            return ResponseUtils.generateDtoFailed(new Information("INVALID_PARAMETER", "SITE_ID_REQUIRED"));
+            Household hh = siteDao.selectHouseholdById(req.getHouseholdId().trim());
+            if (hh != null && hh.getSiteId() != null && !hh.getSiteId().trim().isEmpty()) {
+                req.setSiteId(hh.getSiteId().trim());
+            } else {
+                return ResponseUtils.generateDtoFailed(new Information("INVALID_PARAMETER", "SITE_ID_REQUIRED"));
+            }
         }
 
         String householdId = req.getHouseholdId().trim();
