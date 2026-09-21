@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -117,9 +118,15 @@ public class SiteDao {
 
     public AdminSiteRes selectSiteDetailWithHouseholds(String siteId) {
         try {
-            return siteMapper.selectSiteDetailWithHouseholds(siteId);
+            AdminSiteRes detail = siteMapper.selectSiteSummaryById(siteId);
+            if (detail == null) {
+                return null;
+            }
+            List<HouseholdRes> households = householdMapper.selectBySiteId(siteId);
+            detail.setHouseholds(households != null ? households : new ArrayList<>());
+            return detail;
         } catch (Exception exception) {
-            final String methodName = "SiteMapper#selectSiteDetailWithHouseholds";
+            final String methodName = "SiteDao#selectSiteDetailWithHouseholds";
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("siteId", siteId);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);

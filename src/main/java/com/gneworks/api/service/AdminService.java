@@ -401,8 +401,8 @@ public class AdminService {
 
     /**
      * 현장 상세 조회(관리자 전용, 작업자 배정 정보 포함)
+     * 트랜잭션 없이 각 쿼리별 단기 커넥션 점유 후 즉시 반납
      */
-    @Transactional(readOnly = true)
     public BaseResponse getSiteDetail(String operatorUserId, String siteId) {
         if (isNotAdmin(operatorUserId)) {
             return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));

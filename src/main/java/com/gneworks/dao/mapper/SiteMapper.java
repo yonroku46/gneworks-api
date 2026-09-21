@@ -42,6 +42,8 @@ public interface SiteMapper {
 
     AdminSiteRes selectSiteDetailWithHouseholds(@Param("siteId") String siteId);
 
+    AdminSiteRes selectSiteSummaryById(@Param("siteId") String siteId);
+
     java.util.Map<String, Object> selectRegionalHouseholdSummary(
         @Param("regionId") String regionId
     );

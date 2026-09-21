@@ -252,6 +252,24 @@
     </where>
   </select>
 
+  <!-- 현장 기본 정보 및 요약 집계 단건 조회 (단일 행 조회로 서브쿼리 1회만 실행, 초고속 처리) -->
+  <select id="selectSiteSummaryById" parameterType="java.lang.String" resultMap="SiteListResultMap">
+    select 
+      s.site_id, s.region_id, s.name, 
+      coalesce(fr.name, s.region) as region, 
+      s.address, 
+      coalesce(fr.sido_name, s.sido) as sido, 
+      s.sigungu, s.eupmyeondong,
+      s.contact_phone, s.create_time,
+      (select count(*) from household where site_id = s.site_id) as total_households,
+      (select count(distinct dong) from household where site_id = s.site_id) as dong_count,
+      (select count(distinct h_sub.household_id) from household h_sub inner join work_report wr_sub on h_sub.household_id = wr_sub.household_id and wr_sub.delete_flg = 0 and wr_sub.status = 'COMPLETED' where h_sub.site_id = s.site_id) as completed_households
+    from site s
+    left join fire_region fr on s.region_id = fr.region_id
+    where s.site_id = #{siteId}
+    limit 1
+  </select>
+
   <!-- 현장 상세 조회 (세대 목록 컬렉션 포함) -->
   <select id="selectSiteDetailWithHouseholds" parameterType="java.lang.String" resultMap="SiteDetailResultMap">
     select 

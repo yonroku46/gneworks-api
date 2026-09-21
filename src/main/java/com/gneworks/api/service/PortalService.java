@@ -427,8 +427,8 @@ public class PortalService {
 
     /**
      * 현장 상세 조회 (세대 목록 포함)
+     * 트랜잭션 없이 각 쿼리별 단기 커넥션 점유 후 즉시 반납
      */
-    @Transactional(readOnly = true)
     public BaseResponse getSiteDetail(String siteId) {
         if (siteId == null || siteId.trim().isEmpty()) {
             return ResponseUtils.generateDtoFailed(new Information("INVALID_PARAMETER", "SITE_ID_REQUIRED"));
