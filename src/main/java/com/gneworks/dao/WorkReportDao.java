@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -212,6 +213,18 @@ public class WorkReportDao {
             paramMap.put("userId", userId);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public Map<String, Object> selectNationalReportSummary() {
+        try {
+            return workReportMapper.selectNationalReportSummary();
+        } catch (Exception exception) {
+            final String methodName = "WorkReportMapper#selectNationalReportSummary";
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, Collections.emptyMap(), exception);
             log.error(overview + detail);
             throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
         }

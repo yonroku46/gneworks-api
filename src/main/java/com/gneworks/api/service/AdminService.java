@@ -43,6 +43,7 @@ import com.gneworks.dto.res.AdminDashboardSummaryRes;
 import com.gneworks.dto.res.AdminInquirySummaryRes;
 import com.gneworks.dto.res.AdminSiteRes;
 import com.gneworks.dto.res.AdminUserRes;
+import com.gneworks.dto.res.HouseholdRes;
 import com.gneworks.dto.res.AdminWorkerStatRes;
 import com.gneworks.dto.res.ListRes;
 import com.gneworks.dto.res.PageRes;
@@ -56,6 +57,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -109,6 +111,28 @@ public class AdminService {
 
     @Autowired
     private SystemSettingsDao systemSettingsDao;
+
+    private static class CacheEntry<T> {
+        final T data;
+        final long expireAt;
+
+        CacheEntry(T data, long ttlMillis) {
+            this.data = data;
+            this.expireAt = System.currentTimeMillis() + ttlMillis;
+        }
+
+        boolean isExpired() {
+            return System.currentTimeMillis() > expireAt;
+        }
+    }
+
+    private static final Map<String, CacheEntry<AdminDashboardSummaryRes>> dashboardSummaryCache = new ConcurrentHashMap<>();
+    private static final long NATIONAL_CACHE_TTL_MS = 15_000L; // 전국 요약 캐시 15초 (즉각 반영 및 DB 부하 방지)
+    private static final long REGIONAL_CACHE_TTL_MS = 15_000L;  // 지역 요약 캐시 15초
+
+    public static void invalidateDashboardCache() {
+        dashboardSummaryCache.clear();
+    }
 
     /**
      * 관리자(ROOT, Roles.ROOT, role_id = 9) 여부 확인
@@ -404,10 +428,15 @@ public class AdminService {
      * 트랜잭션 없이 각 쿼리별 단기 커넥션 점유 후 즉시 반납
      */
     public BaseResponse getSiteDetail(String operatorUserId, String siteId) {
+        return getSiteDetail(operatorUserId, siteId, false);
+    }
+
+    public BaseResponse getSiteDetail(String operatorUserId, String siteId, Boolean includeHouseholds) {
         if (isNotAdmin(operatorUserId)) {
             return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
         }
-        AdminSiteRes detail = siteDao.selectSiteDetailWithHouseholds(siteId);
+        boolean withHouseholds = Boolean.TRUE.equals(includeHouseholds);
+        AdminSiteRes detail = siteDao.selectSiteDetailWithHouseholds(siteId, withHouseholds);
         if (detail == null) {
             return ResponseUtils.generateDtoFailed(new Information("SITE_NOT_FOUND", "SITE_NOT_FOUND"));
         }
@@ -416,8 +445,10 @@ public class AdminService {
         } else {
             detail.getHouseholds().removeIf(h -> h == null || h.getHouseholdId() == null);
         }
-        detail.setTotalHouseholds(detail.getHouseholds().size());
-        detail.setDongCount(new HashSet<>(detail.getHouseholds().stream().map(Household::getDong).filter(Objects::nonNull).toList()).size());
+        if (withHouseholds) {
+            detail.setTotalHouseholds(detail.getHouseholds().size());
+            detail.setDongCount(new HashSet<>(detail.getHouseholds().stream().map(Household::getDong).filter(Objects::nonNull).toList()).size());
+        }
         // regionId(외래키)를 기반으로 해당 소방관할에 배정된 작업자 목록 직접 조회
         List<RegionWorkerRes> workers = null;
         if (detail.getRegionId() != null && !detail.getRegionId().trim().isEmpty()) {
@@ -438,6 +469,28 @@ public class AdminService {
         detail.setAssignedWorkers(workers);
 
         return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, detail);
+    }
+
+    /**
+     * 현장별 세대 목록 페이징 조회 (대용량 세대 성능 최적화, 검색 및 보고서 상태 포함)
+     * GET /admin/site/{siteId}/households/paged
+     */
+    @Transactional(readOnly = true)
+    public BaseResponse getSiteHouseholdsPaged(String operatorUserId, String siteId, String query, int page, int size) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
+        }
+        if (page < 1) page = 1;
+        if (size < 1) size = 30;
+        if (size > 100) size = 100;
+
+        String trimmedQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
+        long totalCount = siteDao.selectHouseholdsCountBySiteId(siteId, trimmedQuery);
+        List<HouseholdRes> list = totalCount > 0
+                ? siteDao.selectHouseholdsBySiteIdPaged(siteId, trimmedQuery, page, size)
+                : Collections.emptyList();
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new PageRes<>(list, totalCount, page, size));
     }
 
     /**
@@ -1094,27 +1147,55 @@ public class AdminService {
             return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
         }
 
-        Map<String, Object> householdMap = siteDao.selectRegionalHouseholdSummary(regionId);
-        Map<String, Object> reportMap = workReportDao.selectReportSummary(regionId);
-        long totalWorkers = workReportDao.selectWorkerRankingCount(regionId);
+        boolean isNational = (regionId == null || regionId.trim().isEmpty() || "ALL".equalsIgnoreCase(regionId.trim()));
+        String cacheKey = isNational ? "NATIONAL" : "REGION_" + regionId.trim();
+
+        // 1. 인메모리 캐시 확인 (전국 2분 캐싱으로 DB 부하 원천 차단)
+        CacheEntry<AdminDashboardSummaryRes> cached = dashboardSummaryCache.get(cacheKey);
+        if (cached != null && !cached.isExpired()) {
+            return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, cached.data);
+        }
 
         AdminDashboardSummaryRes res = new AdminDashboardSummaryRes();
-        if (householdMap != null) {
-            res.setTotalSites(((Number) householdMap.getOrDefault("totalSites", 0L)).longValue());
-            res.setTotalTarget(((Number) householdMap.getOrDefault("totalTarget", 0L)).longValue());
-            res.setCompletedTarget(((Number) householdMap.getOrDefault("completedTarget", 0L)).longValue());
-        }
-        if (reportMap != null) {
-            res.setTotalReports(((Number) reportMap.getOrDefault("totalReports", 0L)).longValue());
-            res.setTodayReports(((Number) reportMap.getOrDefault("todayReports", 0L)).longValue());
-            res.setPendingReports(((Number) reportMap.getOrDefault("pendingReports", 0L)).longValue());
-            res.setRejectedReports(((Number) reportMap.getOrDefault("rejectedReports", 0L)).longValue());
-            res.setCompletedReports(((Number) reportMap.getOrDefault("completedReports", 0L)).longValue());
-            res.setIssueReportsCount(((Number) reportMap.getOrDefault("issueReportsCount", 0L)).longValue());
-        }
-        res.setTotalWorkers(totalWorkers);
-        if (res.getTotalTarget() > 0) {
-            res.setProgressRate((int) Math.round(((double) res.getCompletedTarget() / res.getTotalTarget()) * 100));
+
+        if (isNational) {
+            // [전국 집계 최적화] 사이트/세대 조인을 완전히 배제하고, work_report 단일 테이블 기반 인덱스 COUNT로 초경량 처리
+            Map<String, Object> reportMap = workReportDao.selectNationalReportSummary();
+            if (reportMap != null) {
+                res.setTotalReports(((Number) reportMap.getOrDefault("totalReports", 0L)).longValue());
+                res.setTodayReports(((Number) reportMap.getOrDefault("todayReports", 0L)).longValue());
+                res.setPendingReports(((Number) reportMap.getOrDefault("pendingReports", 0L)).longValue());
+                res.setRejectedReports(((Number) reportMap.getOrDefault("rejectedReports", 0L)).longValue());
+                res.setCompletedReports(((Number) reportMap.getOrDefault("completedReports", 0L)).longValue());
+                res.setIssueReportsCount(((Number) reportMap.getOrDefault("issueReportsCount", 0L)).longValue());
+                res.setCompletedTarget(((Number) reportMap.getOrDefault("completedTarget", 0L)).longValue());
+            }
+            dashboardSummaryCache.put(cacheKey, new CacheEntry<>(res, NATIONAL_CACHE_TTL_MS));
+        } else {
+            // [지역별 집계] 기존 동작 유지
+            String cleanRegionId = regionId.trim();
+            Map<String, Object> householdMap = siteDao.selectRegionalHouseholdSummary(cleanRegionId);
+            Map<String, Object> reportMap = workReportDao.selectReportSummary(cleanRegionId);
+            long totalWorkers = workReportDao.selectWorkerRankingCount(cleanRegionId);
+
+            if (householdMap != null) {
+                res.setTotalSites(((Number) householdMap.getOrDefault("totalSites", 0L)).longValue());
+                res.setTotalTarget(((Number) householdMap.getOrDefault("totalTarget", 0L)).longValue());
+                res.setCompletedTarget(((Number) householdMap.getOrDefault("completedTarget", 0L)).longValue());
+            }
+            if (reportMap != null) {
+                res.setTotalReports(((Number) reportMap.getOrDefault("totalReports", 0L)).longValue());
+                res.setTodayReports(((Number) reportMap.getOrDefault("todayReports", 0L)).longValue());
+                res.setPendingReports(((Number) reportMap.getOrDefault("pendingReports", 0L)).longValue());
+                res.setRejectedReports(((Number) reportMap.getOrDefault("rejectedReports", 0L)).longValue());
+                res.setCompletedReports(((Number) reportMap.getOrDefault("completedReports", 0L)).longValue());
+                res.setIssueReportsCount(((Number) reportMap.getOrDefault("issueReportsCount", 0L)).longValue());
+            }
+            res.setTotalWorkers(totalWorkers);
+            if (res.getTotalTarget() > 0) {
+                res.setProgressRate((int) Math.round(((double) res.getCompletedTarget() / res.getTotalTarget()) * 100));
+            }
+            dashboardSummaryCache.put(cacheKey, new CacheEntry<>(res, REGIONAL_CACHE_TTL_MS));
         }
 
         return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
@@ -1220,6 +1301,8 @@ public class AdminService {
                 sendNotificationTask.run();
             }
         }
+
+        invalidateDashboardCache();
 
         ActionRes res = new ActionRes(reportId);
         return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);

@@ -31,7 +31,7 @@ public class AppNotificationController extends BaseController {
         response.setHeader("X-Accel-Buffering", "no");
 
         String userId = getCurrentUserId();
-        log.info("[SSE] Subscription request for user: {}", userId);
+        log.debug("[SSE] Subscription request for user: {}", userId);
         if (userId == null) {
             log.warn("[SSE] Subscription failed: User ID is null");
         }

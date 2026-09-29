@@ -93,4 +93,48 @@
     where h.site_id = #{siteId,jdbcType=CHAR}
     order by h.dong asc, cast(h.ho as unsigned) asc, h.ho asc
   </select>
+
+  <!-- 현장별 세대 목록 페이징 총 건수 (검색 지원) -->
+  <select id="selectBySiteIdCount" resultType="long">
+    select count(*)
+    from household h
+    where h.site_id = #{siteId,jdbcType=CHAR}
+    <if test="query != null and query != ''">
+      and (
+        h.dong like concat('%', #{query}, '%')
+        or concat(h.dong, '동') like concat('%', #{query}, '%')
+        or h.ho like concat('%', #{query}, '%')
+        or concat(h.ho, '호') like concat('%', #{query}, '%')
+        or h.head_name like concat('%', #{query}, '%')
+        or h.remarks like concat('%', #{query}, '%')
+      )
+    </if>
+  </select>
+
+  <!-- 현장별 세대 목록 페이징 조회 (검색 및 작업보고서 조인) -->
+  <select id="selectBySiteIdPaged" resultMap="HouseholdDetailResultMap">
+    select 
+      h.household_id, h.site_id, h.dong, h.ho, h.head_name, h.target_type, h.install_status, h.remarks, 
+      h.create_time,
+      wr.report_id,
+      wr.status as report_status,
+      wr.user_id as report_user_id,
+      wr.reporter_name,
+      date_format(wr.report_time, '%Y-%m-%d %H:%i') as report_time
+    from household h
+    left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0
+    where h.site_id = #{siteId,jdbcType=CHAR}
+    <if test="query != null and query != ''">
+      and (
+        h.dong like concat('%', #{query}, '%')
+        or concat(h.dong, '동') like concat('%', #{query}, '%')
+        or h.ho like concat('%', #{query}, '%')
+        or concat(h.ho, '호') like concat('%', #{query}, '%')
+        or h.head_name like concat('%', #{query}, '%')
+        or h.remarks like concat('%', #{query}, '%')
+      )
+    </if>
+    order by h.dong asc, cast(h.ho as unsigned) asc, h.ho asc
+    limit #{offset}, #{limit}
+  </select>
 </mapper>

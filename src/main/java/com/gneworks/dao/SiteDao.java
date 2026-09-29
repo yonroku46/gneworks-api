@@ -117,18 +117,60 @@ public class SiteDao {
     }
 
     public AdminSiteRes selectSiteDetailWithHouseholds(String siteId) {
+        return selectSiteDetailWithHouseholds(siteId, true);
+    }
+
+    public AdminSiteRes selectSiteDetailWithHouseholds(String siteId, boolean includeHouseholds) {
         try {
             AdminSiteRes detail = siteMapper.selectSiteSummaryById(siteId);
             if (detail == null) {
                 return null;
             }
-            List<HouseholdRes> households = householdMapper.selectBySiteId(siteId);
-            detail.setHouseholds(households != null ? households : new ArrayList<>());
+            if (includeHouseholds) {
+                List<HouseholdRes> households = householdMapper.selectBySiteId(siteId);
+                detail.setHouseholds(households != null ? households : new ArrayList<>());
+            } else {
+                detail.setHouseholds(new ArrayList<>());
+            }
             return detail;
         } catch (Exception exception) {
             final String methodName = "SiteDao#selectSiteDetailWithHouseholds";
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("siteId", siteId);
+            paramMap.put("includeHouseholds", includeHouseholds);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public long selectHouseholdsCountBySiteId(String siteId, String query) {
+        try {
+            return householdMapper.selectBySiteIdCount(siteId, query);
+        } catch (Exception exception) {
+            final String methodName = "SiteDao#selectHouseholdsCountBySiteId";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("siteId", siteId);
+            paramMap.put("query", query);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public List<HouseholdRes> selectHouseholdsBySiteIdPaged(String siteId, String query, int page, int size) {
+        try {
+            int offset = Math.max(0, (page - 1) * size);
+            return householdMapper.selectBySiteIdPaged(siteId, query, offset, size);
+        } catch (Exception exception) {
+            final String methodName = "SiteDao#selectHouseholdsBySiteIdPaged";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("siteId", siteId);
+            paramMap.put("query", query);
+            paramMap.put("page", page);
+            paramMap.put("size", size);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
             log.error(overview + detail);

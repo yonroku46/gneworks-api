@@ -22,5 +22,9 @@ public interface HouseholdMapper {
 
     List<HouseholdRes> selectBySiteId(@Param("siteId") String siteId);
 
+    long selectBySiteIdCount(@Param("siteId") String siteId, @Param("query") String query);
+
+    List<HouseholdRes> selectBySiteIdPaged(@Param("siteId") String siteId, @Param("query") String query, @Param("offset") int offset, @Param("limit") int limit);
+
     int updateByPrimaryKey(Household row);
 }

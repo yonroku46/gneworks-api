@@ -144,12 +144,27 @@ public class AdminController extends BaseController {
     }
 
     /**
-     * 현장 상세 조회 (세대 목록 및 담당 작업자 포함)
+     * 현장 상세 조회 (기본 세대 목록 미포함으로 초고속 응답)
      * GET /admin/site/{siteId}
      */
     @GetMapping("/site/{siteId}")
-    public BaseResponse getSiteDetail(@PathVariable("siteId") String siteId) {
-        return adminService.getSiteDetail(getCurrentUserId(), siteId);
+    public BaseResponse getSiteDetail(
+            @PathVariable("siteId") String siteId,
+            @RequestParam(value = "includeHouseholds", required = false, defaultValue = "false") Boolean includeHouseholds) {
+        return adminService.getSiteDetail(getCurrentUserId(), siteId, includeHouseholds);
+    }
+
+    /**
+     * 현장별 세대 목록 페이징 조회 (대용량 세대 성능 최적화, 검색 지원)
+     * GET /admin/site/{siteId}/households/paged
+     */
+    @GetMapping("/site/{siteId}/households/paged")
+    public BaseResponse getSiteHouseholdsPaged(
+            @PathVariable("siteId") String siteId,
+            @RequestParam(value = "query", required = false) String query,
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "size", defaultValue = "30") int size) {
+        return adminService.getSiteHouseholdsPaged(getCurrentUserId(), siteId, query, page, size);
     }
 
     /**

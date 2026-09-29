@@ -49,6 +49,9 @@
     <logger name="org.springframework.web.servlet.DispatcherServlet" level="ERROR" additivity="false">
         <appender-ref ref="ERROR_LOG"/>
     </logger>
+    <logger name="org.springframework.web.servlet.mvc.support.DefaultHandlerExceptionResolver" level="ERROR" additivity="false">
+        <appender-ref ref="ERROR_LOG"/>
+    </logger>
 
     <root level="INFO">
         <appender-ref ref="STDOUT" />

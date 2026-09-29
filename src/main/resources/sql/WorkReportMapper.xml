@@ -393,17 +393,37 @@
     ) t
   </select>
 
+  <!-- 대시보드용 전국 전용 초경량 요약 통계 (현장/세대 3중 조인 배제, 단일 테이블 인덱스 집계) -->
+  <select id="selectNationalReportSummary" resultType="map">
+    select 
+      count(*) as totalReports,
+      count(case when date(wr.report_time) = date(date_add(utc_timestamp(), interval 9 hour))
+                   or (wr.report_time is null and date(wr.create_time) = date(date_add(utc_timestamp(), interval 9 hour)))
+                 then 1 end) as todayReports,
+      count(case when wr.status = 'PENDING' then 1 end) as pendingReports,
+      count(case when wr.status = 'REJECTED' then 1 end) as rejectedReports,
+      count(case when wr.status = 'COMPLETED' then 1 end) as completedReports,
+      count(case when wr.status = 'PENDING' and wr.remarks is not null and trim(wr.remarks) != '' and wr.remarks not like '%특이사항 없음%' then 1 end) as issueReportsCount,
+      count(distinct case when wr.status = 'COMPLETED' then coalesce(wr.household_id, wr.report_id) end) as completedTarget
+    from work_report wr
+    where wr.delete_flg = 0
+  </select>
+
   <!-- 대시보드용 시공 보고서 요약 통계 -->
   <select id="selectReportSummary" resultType="map">
     select 
       count(*) as totalReports,
-      count(case when date(wr.install_date) = curdate() or date(wr.report_time) = curdate() then 1 end) as todayReports,
+      count(case when date(wr.report_time) = date(date_add(utc_timestamp(), interval 9 hour))
+                   or (wr.report_time is null and date(wr.create_time) = date(date_add(utc_timestamp(), interval 9 hour)))
+                 then 1 end) as todayReports,
       count(case when wr.status = 'PENDING' then 1 end) as pendingReports,
       count(case when wr.status = 'REJECTED' then 1 end) as rejectedReports,
       count(case when wr.status = 'COMPLETED' then 1 end) as completedReports,
       count(case when wr.status = 'PENDING' and wr.remarks is not null and trim(wr.remarks) != '' and wr.remarks not like '%특이사항 없음%' then 1 end) as issueReportsCount
     from work_report wr
-    left join site s on wr.site_id = s.site_id
+    <if test="regionId != null and regionId != ''">
+      left join site s on wr.site_id = s.site_id
+    </if>
     where wr.delete_flg = 0
     <if test="regionId != null and regionId != ''">
       and s.region_id = #{regionId}

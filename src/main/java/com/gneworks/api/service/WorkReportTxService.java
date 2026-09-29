@@ -78,6 +78,7 @@ public class WorkReportTxService {
             report.setDeleteFlg(false);
 
             workReportDao.insert(report);
+            AdminService.invalidateDashboardCache();
             return workReportDao.selectReportDetailById(report.getReportId());
         } else {
             // 기존 보고서 수정
@@ -109,6 +110,7 @@ public class WorkReportTxService {
                 siteDao.updateHousehold(hh);
             }
 
+            AdminService.invalidateDashboardCache();
             return workReportDao.selectReportDetailById(existing.getReportId());
         }
     }

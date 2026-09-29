@@ -38,17 +38,18 @@ public class SseService {
         };
 
         emitter.onCompletion(() -> {
-            log.info("SSE connection completed for user: {}", userId);
+            log.debug("SSE connection completed for user: {}", userId);
             removeEmitter.run();
         });
         emitter.onTimeout(() -> {
-            log.info("SSE connection timeout for user: {}", userId);
-            emitter.complete();
+            log.debug("SSE connection timeout for user: {}", userId);
+            try {
+                emitter.complete();
+            } catch (Exception ignored) {}
             removeEmitter.run();
         });
         emitter.onError((e) -> {
-            log.debug("SSE connection error for user: {}: {}", userId, e.getMessage());
-            emitter.complete();
+            log.debug("SSE connection error for user {}: {}", userId, e.getMessage());
             removeEmitter.run();
         });
 
@@ -57,8 +58,11 @@ public class SseService {
             emitter.send(SseEmitter.event()
                     .name("connect")
                     .data("connected"));
-        } catch (IOException e) {
-            log.error("Failed to send initial SSE event for user: {}", userId);
+        } catch (Exception e) {
+            log.debug("Failed to send initial SSE event for user: {}", userId);
+            try {
+                emitter.complete();
+            } catch (Exception ignored) {}
             removeEmitter.run();
         }
 
@@ -74,8 +78,11 @@ public class SseService {
                             .name("notification")
                             .data(data));
                     log.info("Sent SSE notification to user: {}", userId);
-                } catch (IOException e) {
-                    log.error("Failed to send SSE notification to user: {}", userId);
+                } catch (Exception e) {
+                    log.debug("Failed to send SSE notification to user: {}", userId);
+                    try {
+                        emitter.complete();
+                    } catch (Exception ignored) {}
                     userEmitters.remove(emitter);
                 }
             }
@@ -97,8 +104,11 @@ public class SseService {
                     emitter.send(SseEmitter.event()
                             .name("ping")
                             .data("heartbeat"));
-                } catch (IOException e) {
-                    log.warn("[SSE] Removing dead emitter for user: {}", userId);
+                } catch (Exception e) {
+                    log.debug("[SSE] Removing dead emitter for user: {}", userId);
+                    try {
+                        emitter.complete();
+                    } catch (Exception ignored) {}
                     list.remove(emitter);
                 }
             }

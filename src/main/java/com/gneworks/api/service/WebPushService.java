@@ -54,10 +54,10 @@ public class WebPushService {
     }
 
     @Async
-    public boolean sendPushNotification(String endpoint, String p256dh, String auth, String payload) {
+    public void sendPushNotification(String endpoint, String p256dh, String auth, String payload) {
         if (pushService == null) {
             log.error("PushService is not initialized. Cannot send push notification.");
-            return false;
+            return;
         }
         try {
             Subscription subscription = new Subscription(endpoint, new Subscription.Keys(p256dh, auth));
@@ -69,10 +69,7 @@ public class WebPushService {
             if (statusCode == 404 || statusCode == 410) {
                 log.info("Push subscription expired ({}), removing endpoint: {}", statusCode, endpoint);
                 pushSubscriptionDao.deleteByEndpoint(endpoint);
-                return false;
             }
-
-            return statusCode >= 200 && statusCode < 300;
         } catch (Exception e) {
             log.error("Failed to send WebPush notification to endpoint {}: {}", endpoint, e.getMessage());
             // If the error indicates gone/invalid subscription, remove endpoint
@@ -83,7 +80,6 @@ public class WebPushService {
                     log.error("Failed to delete expired endpoint: {}", ex.getMessage());
                 }
             }
-            return false;
         }
     }
 }

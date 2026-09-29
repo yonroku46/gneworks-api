@@ -70,4 +70,6 @@ public interface WorkReportMapper {
             @Param("regionId") String regionId,
             @Param("userId") String userId
     );
+
+    Map<String, Object> selectNationalReportSummary();
 }
