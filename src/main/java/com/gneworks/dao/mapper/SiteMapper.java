@@ -1,9 +1,11 @@
 package com.gneworks.dao.mapper;
 
 import com.gneworks.dao.entity.Site;
+import com.gneworks.dto.res.AdminHouseholdExportRes;
 import com.gneworks.dto.res.AdminSiteRes;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
+import java.util.Map;
 
 public interface SiteMapper {
     int deleteByPrimaryKey(String siteId);
@@ -44,7 +46,21 @@ public interface SiteMapper {
 
     AdminSiteRes selectSiteSummaryById(@Param("siteId") String siteId);
 
-    java.util.Map<String, Object> selectRegionalHouseholdSummary(
+    Map<String, Object> selectRegionalHouseholdSummary(
         @Param("regionId") String regionId
+    );
+
+    List<AdminHouseholdExportRes> selectHouseholdExportList(
+        @Param("regionId") String regionId,
+        @Param("query") String query
+    );
+    Map<String, Object> selectSiteSummaryStat(
+        @Param("regionId") String regionId,
+        @Param("query") String query
+    );
+
+    long selectSiteWorkerCount(
+        @Param("regionId") String regionId,
+        @Param("query") String query
     );
 }

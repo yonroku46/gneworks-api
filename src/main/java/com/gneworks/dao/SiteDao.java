@@ -11,7 +11,9 @@ import com.gneworks.dao.mapper.FireRegionMapper;
 import com.gneworks.dao.mapper.HouseholdMapper;
 import com.gneworks.dao.mapper.SiteMapper;
 import com.gneworks.dao.mapper.UserAssignedRegionMapper;
+import com.gneworks.dto.res.AdminHouseholdExportRes;
 import com.gneworks.dto.res.AdminSiteRes;
+import com.gneworks.dto.res.AdminSiteSummaryRes;
 import com.gneworks.dto.res.HouseholdRes;
 import com.gneworks.dto.res.RegionWorkerRes;
 import com.gneworks.dto.res.UserAssignedRegionDetailRes;
@@ -108,6 +110,21 @@ public class SiteDao {
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("regionId", regionId);
             paramMap.put("regionIds", regionIds);
+            paramMap.put("query", query);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public List<AdminHouseholdExportRes> selectHouseholdExportList(String regionId, String query) {
+        try {
+            return siteMapper.selectHouseholdExportList(regionId, query);
+        } catch (Exception exception) {
+            final String methodName = "SiteMapper#selectHouseholdExportList";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("regionId", regionId);
             paramMap.put("query", query);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
@@ -494,6 +511,43 @@ public class SiteDao {
             final String methodName = "SiteMapper#selectRegionalHouseholdSummary";
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("regionId", regionId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+    public AdminSiteSummaryRes selectSiteSummary(String regionId, String query) {
+        try {
+            Map<String, Object> statMap = siteMapper.selectSiteSummaryStat(regionId, query);
+            long totalSites = 0L;
+            long totalHouseholds = 0L;
+            long totalDongs = 0L;
+            if (statMap != null) {
+                Number sNum = (Number) statMap.get("totalSites");
+                Number hNum = (Number) statMap.get("totalHouseholds");
+                Number dNum = (Number) statMap.get("totalDongs");
+                if (sNum != null) totalSites = sNum.longValue();
+                if (hNum != null) totalHouseholds = hNum.longValue();
+                if (dNum != null) totalDongs = dNum.longValue();
+            }
+
+            long totalWorkers = 0L;
+            if (totalSites > 0) {
+                totalWorkers = siteMapper.selectSiteWorkerCount(regionId, query);
+            }
+
+            return AdminSiteSummaryRes.builder()
+                    .totalSites(totalSites)
+                    .totalHouseholds(totalHouseholds)
+                    .totalDongs(totalDongs)
+                    .totalWorkers(totalWorkers)
+                    .build();
+        } catch (Exception exception) {
+            final String methodName = "SiteMapper#selectSiteSummaryStat";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("regionId", regionId);
+            paramMap.put("query", query);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
             log.error(overview + detail);

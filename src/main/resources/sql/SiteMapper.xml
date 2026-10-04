@@ -319,4 +319,99 @@
       </if>
     </where>
   </select>
+
+  <!-- 현장별 세대 목록 대용량 엑셀 다운로드용 ResultMap -->
+  <resultMap id="HouseholdExportResultMap" type="com.gneworks.dto.res.AdminHouseholdExportRes">
+    <id column="household_id" property="householdId" />
+    <result column="site_id" property="siteId" />
+    <result column="region" property="region" />
+    <result column="sido" property="sido" />
+    <result column="sigungu" property="sigungu" />
+    <result column="eupmyeondong" property="eupmyeondong" />
+    <result column="address" property="address" />
+    <result column="site_name" property="siteName" />
+    <result column="dong" property="dong" />
+    <result column="ho" property="ho" />
+    <result column="head_name" property="headName" />
+    <result column="target_type" property="targetType" />
+    <result column="install_status" property="installStatus" />
+    <result column="report_status" property="reportStatus" />
+    <result column="reporter_name" property="reporterName" />
+    <result column="report_time" property="reportTime" />
+    <result column="remarks" property="remarks" />
+  </resultMap>
+
+  <!-- 관리자 현장 리스트 조건 기반 전체 세대 목록 엑셀 내보내기 조회 -->
+  <select id="selectHouseholdExportList" resultMap="HouseholdExportResultMap">
+    select 
+      h.household_id,
+      h.site_id,
+      coalesce(fr.name, s.region) as region,
+      coalesce(fr.sido_name, s.sido) as sido,
+      s.sigungu,
+      s.eupmyeondong,
+      s.address,
+      s.name as site_name,
+      h.dong,
+      h.ho,
+      h.head_name,
+      h.target_type,
+      h.install_status,
+      wr.status as report_status,
+      wr.reporter_name,
+      date_format(wr.report_time, '%Y-%m-%d %H:%i') as report_time,
+      h.remarks
+    from household h
+    inner join site s on h.site_id = s.site_id
+    left join fire_region fr on s.region_id = fr.region_id
+    left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0
+    <where>
+      <if test="regionId != null and regionId != ''">
+        and s.region_id = #{regionId}
+      </if>
+      <if test="query != null and query != ''">
+        and (s.name like concat('%', #{query}, '%') or s.address like concat('%', #{query}, '%'))
+      </if>
+    </where>
+    order by s.name asc, h.dong asc, h.ho asc
+  </select>
+
+  <!-- ?꾩옣 紐⑸줉 ?곷떒 ?붿빟 ?듦퀎: 珥??꾩옣?? 珥??몃??? 珥??숈닔 -->
+  <select id="selectSiteSummaryStat" resultType="map">
+    select 
+      count(distinct s.site_id) as totalSites,
+      coalesce(count(h.household_id), 0) as totalHouseholds,
+      coalesce(count(distinct s.site_id, h.dong), 0) as totalDongs
+    from site s
+    left join household h on s.site_id = h.site_id
+    <where>
+      <if test="regionId != null and regionId != ''">
+        and s.region_id = #{regionId}
+      </if>
+      <if test="query != null and query != ''">
+        and (s.name like concat('%', #{query}, '%') or s.address like concat('%', #{query}, '%'))
+      </if>
+    </where>
+  </select>
+
+  <!-- ?꾩옣 紐⑸줉 ?곷떒 ?붿빟 ?듦퀎: 議곌굔蹂?怨좎쑀 吏???대떦????-->
+  <select id="selectSiteWorkerCount" resultType="long">
+    select count(distinct uar.user_id)
+    from user_assigned_region uar
+    join user u on uar.user_id = u.user_id
+    where u.delete_flg = 0 and u.role_id = 1
+    <choose>
+      <when test="regionId != null and regionId != ''">
+        and uar.region_id = #{regionId}
+      </when>
+      <when test="query != null and query != ''">
+        and uar.region_id in (
+          select distinct s.region_id 
+          from site s 
+          where (s.name like concat('%', #{query}, '%') or s.address like concat('%', #{query}, '%'))
+            and s.region_id is not null and s.region_id != ''
+        )
+      </when>
+    </choose>
+  </select>
 </mapper>

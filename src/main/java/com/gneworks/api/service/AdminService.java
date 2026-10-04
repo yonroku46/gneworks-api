@@ -40,8 +40,10 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.gneworks.common.utils.S3Utils;
 import org.springframework.web.multipart.MultipartFile;
 import com.gneworks.dto.res.AdminDashboardSummaryRes;
+import com.gneworks.dto.res.AdminHouseholdExportRes;
 import com.gneworks.dto.res.AdminInquirySummaryRes;
 import com.gneworks.dto.res.AdminSiteRes;
+import com.gneworks.dto.res.AdminSiteSummaryRes;
 import com.gneworks.dto.res.AdminUserRes;
 import com.gneworks.dto.res.HouseholdRes;
 import com.gneworks.dto.res.AdminWorkerStatRes;
@@ -50,6 +52,9 @@ import com.gneworks.dto.res.PageRes;
 import com.gneworks.dto.res.RegionWorkerRes;
 import com.gneworks.dto.res.UserAssignedRegionDetailRes;
 import com.gneworks.dto.res.WorkReportRes;
+import com.gneworks.dto.res.ServiceStatisticsRes;
+import com.gneworks.dao.RegionDailyStatDao;
+import com.gneworks.dao.entity.RegionDailyStat;
 import com.gneworks.dto.res.core.BaseResponse;
 import com.gneworks.dto.res.core.Information;
 import com.gneworks.common.utils.ExcelStreamingUtil;
@@ -68,6 +73,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -111,6 +117,9 @@ public class AdminService {
 
     @Autowired
     private SystemSettingsDao systemSettingsDao;
+
+    @Autowired
+    private RegionDailyStatDao regionDailyStatDao;
 
     private static class CacheEntry<T> {
         final T data;
@@ -394,6 +403,11 @@ public class AdminService {
      */
     @Transactional(readOnly = true)
     public BaseResponse getSiteListPaged(String operatorUserId, String regionId, String query, int page, int size) {
+        return getSiteListPaged(operatorUserId, regionId, query, page, size, null);
+    }
+
+    @Transactional(readOnly = true)
+    public BaseResponse getSiteListPaged(String operatorUserId, String regionId, String query, int page, int size, Boolean includeSummary) {
         if (isNotAdmin(operatorUserId)) {
             return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
         }
@@ -406,11 +420,19 @@ public class AdminService {
                 ? siteDao.selectSiteListPaged(regionId, query, page, size)
                 : Collections.emptyList();
 
-        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new PageRes<>(sites, totalCount, page, size));
+        AdminSiteSummaryRes summary = null;
+        boolean needSummary = includeSummary != null ? includeSummary : (page == 1);
+        if (needSummary) {
+            summary = totalCount > 0
+                    ? siteDao.selectSiteSummary(regionId, query)
+                    : new AdminSiteSummaryRes(0, 0, 0, 0);
+        }
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new PageRes<>(sites, totalCount, page, size, summary));
     }
 
     /**
-     * 현장 목록 대용량 엑셀 스트리밍 다운로드 (제네릭 ExcelStreamingUtil 활용)
+     * 현장 관리 - 전체 보급대상 세대 목록 대용량 엑셀 스트리밍 다운로드
      */
     @Transactional(readOnly = true)
     public void exportSitesExcel(String operatorUserId, String regionId, String query, HttpServletResponse response) throws IOException {
@@ -419,8 +441,26 @@ public class AdminService {
             return;
         }
 
-        List<AdminSiteRes> sites = siteDao.selectSiteList(regionId, query, null, null);
-        ExcelStreamingUtil.export(response, "현장목록", sites, AdminSiteRes.class);
+        List<AdminHouseholdExportRes> households = siteDao.selectHouseholdExportList(regionId, query);
+        if (households != null) {
+            for (AdminHouseholdExportRes h : households) {
+                enrichHouseholdExportRes(h);
+            }
+        } else {
+            households = Collections.emptyList();
+        }
+        // 파일명 생성: {지역명}_세대목록_{yyMMdd}.xlsx (예: 분당_세대목록_261001)
+        String regionName = "전국";
+        if (regionId != null && !regionId.trim().isEmpty() && !"ALL".equalsIgnoreCase(regionId.trim())) {
+            FireRegion fr = siteDao.selectFireRegionById(regionId.trim());
+            if (fr != null && fr.getName() != null && !fr.getName().trim().isEmpty()) {
+                regionName = fr.getName().trim();
+            }
+        }
+        String dateStr = new SimpleDateFormat("yyMMdd").format(new Date());
+        String fileBaseName = regionName + "_세대목록_" + dateStr;
+
+        ExcelStreamingUtil.export(response, fileBaseName, households, AdminHouseholdExportRes.class);
     }
 
     /**
@@ -1526,6 +1566,52 @@ public class AdminService {
         }
     }
 
+    private void enrichHouseholdExportRes(AdminHouseholdExportRes res) {
+        if (res == null) return;
+
+        // 1. 보급 대상 유형 한글화 (서비스 표준 형태)
+        if (res.getTargetType() != null) {
+            String type = res.getTargetType().trim().toUpperCase();
+            switch (type) {
+                case "CHILD" -> res.setTargetType("아동(13세 미만)");
+                case "ELDERLY" -> res.setTargetType("노인(65세 이상)");
+                case "DISABLED" -> res.setTargetType("장애인");
+                case "GENERAL" -> res.setTargetType("일반");
+                default -> {}
+            }
+        } else {
+            res.setTargetType("일반");
+        }
+
+        // 2. 설치 상태 한글화 (서비스 표준 형태)
+        if (res.getInstallStatus() != null) {
+            String status = res.getInstallStatus().trim().toUpperCase();
+            switch (status) {
+                case "INSTALLED" -> res.setInstallStatus("설치완료");
+                case "UNINSTALLED" -> res.setInstallStatus("미설치");
+                case "SCHEDULED" -> res.setInstallStatus("방문예정");
+                case "HOLD", "ON_HOLD", "ABSENT" -> res.setInstallStatus("부재/보류");
+                default -> {}
+            }
+        } else {
+            res.setInstallStatus("미설치");
+        }
+
+        // 3. 보고서 상태 한글화
+        if (res.getReportStatus() != null && !res.getReportStatus().trim().isEmpty()) {
+            String rStatus = res.getReportStatus().trim().toUpperCase();
+            switch (rStatus) {
+                case "COMPLETED" -> res.setReportStatus("확인완료");
+                case "PENDING" -> res.setReportStatus("검토대기");
+                case "REJECTED" -> res.setReportStatus("수정필요");
+                case "UNSUBMITTED" -> res.setReportStatus("미제출");
+                default -> {}
+            }
+        } else {
+            res.setReportStatus("미제출");
+        }
+    }
+
     private String formatPhoneNumber(String phone) {
         if (phone == null) return null;
         String digits = phone.replaceAll("[^0-9]", "");
@@ -1643,5 +1729,168 @@ public class AdminService {
         ActionRes res = new ActionRes();
         res.setSuccess(Boolean.TRUE);
         return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
+    }
+
+    // ── [9. 소방관할별 일일/월별 통계 및 배치] ──────────────────────────────────────────
+
+    /**
+     * 일일 통계 배치 실행 (소방관할별 스냅샷 UPSERT)
+     */
+    @Transactional
+    public void generateDailyStats(Date statDate) {
+        if (statDate == null) {
+            statDate = new Date();
+        }
+        log.info("[Batch] Starting region_daily_stat upsert for date: {}", DATE_FORMAT.format(statDate));
+        int count = regionDailyStatDao.upsertDailyStatsForDate(statDate);
+        log.info("[Batch] region_daily_stat upsert completed. Affected rows: {}", count);
+    }
+
+    /**
+     * 관리자 수동 일일 통계 배치 트리거
+     */
+    @Transactional
+    public BaseResponse generateDailyStatisticsManually(String operatorUserId) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "FORBIDDEN"));
+        }
+        generateDailyStats(new Date());
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, new ActionRes("OK"));
+    }
+
+    /**
+     * 월별 소방관할 집계 통계 조회
+     * GET /admin/statistics/monthly?yearMonth=YYYY-MM
+     */
+    @Transactional
+    public BaseResponse getMonthlyStatistics(String operatorUserId, String yearMonth, Boolean refresh) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "FORBIDDEN"));
+        }
+
+        if (yearMonth == null || yearMonth.trim().isEmpty()) {
+            yearMonth = new SimpleDateFormat("yyyy-MM").format(new Date());
+        } else {
+            yearMonth = yearMonth.trim();
+        }
+
+        Date startDate;
+        Date endDate;
+        try {
+            String[] parts = yearMonth.split("-");
+            int year = Integer.parseInt(parts[0]);
+            int month = Integer.parseInt(parts[1]);
+            java.time.YearMonth ym = java.time.YearMonth.of(year, month);
+            startDate = java.sql.Date.valueOf(ym.atDay(1));
+            endDate = java.sql.Date.valueOf(ym.atEndOfMonth());
+        } catch (Exception e) {
+            log.error("Invalid yearMonth parameter: {}", yearMonth, e);
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_PARAMETER", "연월 형식이 올바르지 않습니다 (예: 2026-09)"));
+        }
+
+        Date today = new Date();
+        boolean isCurrentMonth = !endDate.before(today);
+
+        // 당월(진행 중인 달)인 경우:
+        // 통계의 공식 기준일은 오늘 기준 전날(D-1, 어제)입니다.
+        // 어제 일자의 마감 스냅샷이 DB에 존재하지 않으면(스케줄러 미실행 등) 자동으로 어제자 스냅샷을 생성/보정합니다.
+        if (isCurrentMonth) {
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(today);
+            cal.add(Calendar.DATE, -1);
+            Date yesterday = cal.getTime();
+
+            Date targetStatDate = yesterday.before(startDate) ? startDate : yesterday;
+            int targetStatCount = regionDailyStatDao.countByDateRange(targetStatDate, targetStatDate);
+            if (targetStatCount == 0) {
+                generateDailyStats(targetStatDate);
+            }
+        }
+
+        // 해당 월 기간 내 적재된 소방관할별 최신 통계 스냅샷 조회
+        List<RegionDailyStat> statsList = regionDailyStatDao.selectMonthlyStats(startDate, endDate);
+
+        long sumSites = 0;
+        long sumTarget = 0;
+        long sumCompletedTarget = 0;
+        long sumReports = 0;
+        long sumCompletedReports = 0;
+        long sumPendingReports = 0;
+        long sumIssueReports = 0;
+
+        Date latestStatDate = null;
+        List<ServiceStatisticsRes.RegionMonthlyStatItem> items = new ArrayList<>();
+        if (statsList != null) {
+            for (RegionDailyStat s : statsList) {
+                if (s.getStatDate() != null) {
+                    if (latestStatDate == null || s.getStatDate().after(latestStatDate)) {
+                        latestStatDate = s.getStatDate();
+                    }
+                }
+                int sites = s.getTotalSites() != null ? s.getTotalSites() : 0;
+                int target = s.getTotalTarget() != null ? s.getTotalTarget() : 0;
+                int completedTarget = s.getCompletedTarget() != null ? s.getCompletedTarget() : 0;
+                int rate = target > 0 ? (int) Math.round(((double) completedTarget / target) * 100) : 0;
+
+                int reports = s.getTotalReports() != null ? s.getTotalReports() : 0;
+                int completedReports = s.getCompletedReports() != null ? s.getCompletedReports() : 0;
+                int pendingReports = s.getPendingReports() != null ? s.getPendingReports() : 0;
+                int issueReports = s.getIssueReportsCount() != null ? s.getIssueReportsCount() : 0;
+
+                sumSites += sites;
+                sumTarget += target;
+                sumCompletedTarget += completedTarget;
+                sumReports += reports;
+                sumCompletedReports += completedReports;
+                sumPendingReports += pendingReports;
+                sumIssueReports += issueReports;
+
+                String sido = s.getSidoName() != null ? s.getSidoName().trim() : "";
+                String rName = s.getName() != null ? s.getName().trim() : "";
+                String displayName = sido + (rName.isEmpty() ? "" : " " + rName);
+
+                items.add(ServiceStatisticsRes.RegionMonthlyStatItem.builder()
+                        .regionId(s.getRegionId())
+                        .sidoName(sido)
+                        .regionName(rName)
+                        .displayName(displayName)
+                        .totalSites(sites)
+                        .totalTarget(target)
+                        .completedTarget(completedTarget)
+                        .progressRate(rate)
+                        .totalReports(reports)
+                        .completedReports(completedReports)
+                        .pendingReports(pendingReports)
+                        .issueReportsCount(issueReports)
+                        .build());
+            }
+        }
+
+        int overallRate = sumTarget > 0 ? (int) Math.round(((double) sumCompletedTarget / sumTarget) * 100) : 0;
+
+        ServiceStatisticsRes.Summary summary = ServiceStatisticsRes.Summary.builder()
+                .totalSites(sumSites)
+                .totalTarget(sumTarget)
+                .completedTarget(sumCompletedTarget)
+                .overallProgressRate(overallRate)
+                .totalReports(sumReports)
+                .completedReports(sumCompletedReports)
+                .pendingReports(sumPendingReports)
+                .issueReportsCount(sumIssueReports)
+                .build();
+
+        String baseDateStr = latestStatDate != null 
+                ? new SimpleDateFormat("yyyy-MM-dd").format(latestStatDate)
+                : null;
+
+        ServiceStatisticsRes responseData = ServiceStatisticsRes.builder()
+                .yearMonth(yearMonth)
+                .baseDate(baseDateStr)
+                .totalRegionCount(items.size())
+                .summary(summary)
+                .list(items)
+                .build();
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, responseData);
     }
 }

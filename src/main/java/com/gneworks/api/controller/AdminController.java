@@ -127,8 +127,9 @@ public class AdminController extends BaseController {
             @RequestParam(value = "regionId", required = false) String regionId,
             @RequestParam(value = "query", required = false) String query,
             @RequestParam(value = "page", defaultValue = "1") int page,
-            @RequestParam(value = "size", defaultValue = "30") int size) {
-        return adminService.getSiteListPaged(getCurrentUserId(), regionId, query, page, size);
+            @RequestParam(value = "size", defaultValue = "30") int size,
+            @RequestParam(value = "includeSummary", required = false) Boolean includeSummary) {
+        return adminService.getSiteListPaged(getCurrentUserId(), regionId, query, page, size, includeSummary);
     }
 
     /**
@@ -467,5 +468,27 @@ public class AdminController extends BaseController {
     @PutMapping("/settings")
     public BaseResponse updateSettings(@RequestBody SystemSettingsReq req) {
         return adminService.updateSettings(getCurrentUserId(), req);
+    }
+
+    // ── [9. 서비스 통계 (일일 집계 기반)] ───────────────────────────────
+
+    /**
+     * 월별 소방관할 집계 통계 조회
+     * GET /admin/statistics/monthly?yearMonth=YYYY-MM&refresh=false
+     */
+    @GetMapping("/statistics/monthly")
+    public BaseResponse getMonthlyStatistics(
+            @RequestParam(value = "yearMonth", required = false) String yearMonth,
+            @RequestParam(value = "refresh", required = false, defaultValue = "false") Boolean refresh) {
+        return adminService.getMonthlyStatistics(getCurrentUserId(), yearMonth, refresh);
+    }
+
+    /**
+     * 일일 통계 배치 수동 실행 (오늘자 스냅샷 강제 생성/갱신)
+     * POST /admin/statistics/daily/generate
+     */
+    @PostMapping("/statistics/daily/generate")
+    public BaseResponse generateDailyStatistics() {
+        return adminService.generateDailyStatisticsManually(getCurrentUserId());
     }
 }
