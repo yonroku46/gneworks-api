@@ -333,7 +333,8 @@
       coalesce(sum(case when wr.report_id is not null then 1 else 0 end), 0) as total,
       coalesce(sum(case when wr.status = 'COMPLETED' then 1 else 0 end), 0) as completed,
       coalesce(sum(case when wr.status = 'PENDING' then 1 else 0 end), 0) as pending,
-      coalesce(sum(case when wr.status = 'REJECTED' then 1 else 0 end), 0) as rejected
+      coalesce(sum(case when wr.status = 'REJECTED' then 1 else 0 end), 0) as rejected,
+      coalesce(sum(case when wr.status = 'REFUSED' then 1 else 0 end), 0) as refused
     from (
       select distinct u.user_id, u.user_name as name, u.phone_num as phone, u.profile_img
       from user u
@@ -403,6 +404,7 @@
       count(case when wr.status = 'PENDING' then 1 end) as pendingReports,
       count(case when wr.status = 'REJECTED' then 1 end) as rejectedReports,
       count(case when wr.status = 'COMPLETED' then 1 end) as completedReports,
+      count(case when wr.status = 'REFUSED' then 1 end) as refusedReports,
       count(case when wr.status = 'PENDING' and wr.remarks is not null and trim(wr.remarks) != '' and wr.remarks not like '%특이사항 없음%' then 1 end) as issueReportsCount,
       count(distinct case when wr.status = 'COMPLETED' then coalesce(wr.household_id, wr.report_id) end) as completedTarget
     from work_report wr
@@ -419,6 +421,7 @@
       count(case when wr.status = 'PENDING' then 1 end) as pendingReports,
       count(case when wr.status = 'REJECTED' then 1 end) as rejectedReports,
       count(case when wr.status = 'COMPLETED' then 1 end) as completedReports,
+      count(case when wr.status = 'REFUSED' then 1 end) as refusedReports,
       count(case when wr.status = 'PENDING' and wr.remarks is not null and trim(wr.remarks) != '' and wr.remarks not like '%특이사항 없음%' then 1 end) as issueReportsCount
     from work_report wr
     <if test="regionId != null and regionId != ''">
@@ -479,4 +482,26 @@
         last_update = now()
     where report_id = #{reportId} and delete_flg = 0
   </update>
+
+  <!-- 소방관할별 설치거부(REFUSED) 보고서 건수 집계 -->
+  <select id="selectRegionalRefusedSummary" resultType="map">
+    select 
+      coalesce(s.region_id, s_hh.region_id) as regionId,
+      count(*) as refusedCount
+    from work_report wr
+    left join site s on wr.site_id = s.site_id
+    left join household hh on wr.household_id = hh.household_id
+    left join site s_hh on hh.site_id = s_hh.site_id
+    where wr.delete_flg = 0
+      and wr.status = 'REFUSED'
+      and coalesce(s.region_id, s_hh.region_id) is not null
+      and coalesce(s.region_id, s_hh.region_id) != ''
+      <if test="startDate != null">
+        and coalesce(wr.report_time, wr.create_time) &gt;= #{startDate}
+      </if>
+      <if test="endDate != null">
+        and coalesce(wr.report_time, wr.create_time) &lt;= #{endDate}
+      </if>
+    group by coalesce(s.region_id, s_hh.region_id)
+  </select>
 </mapper>

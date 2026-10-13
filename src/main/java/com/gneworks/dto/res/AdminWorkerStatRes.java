@@ -12,4 +12,5 @@ public class AdminWorkerStatRes {
     private int completed;
     private int pending;
     private int rejected;
+    private int refused;
 }

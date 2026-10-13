@@ -33,6 +33,7 @@ public class ServiceStatisticsRes extends ResponseData {
         private long totalReports;
         private long completedReports;
         private long pendingReports;
+        private long refusedReports;
         private long issueReportsCount;
     }
 
@@ -52,6 +53,7 @@ public class ServiceStatisticsRes extends ResponseData {
         private int totalReports;
         private int completedReports;
         private int pendingReports;
+        private int refusedReports;
         private int issueReportsCount;
     }
 }

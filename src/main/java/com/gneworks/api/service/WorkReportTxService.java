@@ -71,13 +71,23 @@ public class WorkReportTxService {
             report.setPhotoAfter1(photoAfter1);
             report.setPhotoBefore2(photoBefore2);
             report.setPhotoAfter2(photoAfter2);
-            report.setStatus(req.getStatus() != null && !req.getStatus().trim().isEmpty() ? req.getStatus().trim() : "PENDING");
+            String targetStatus = (req.getStatus() != null && !req.getStatus().trim().isEmpty()) ? req.getStatus().trim().toUpperCase() : "PENDING";
+            report.setStatus(targetStatus);
             report.setRemarks(req.getRemarks());
             report.setCreateTime(now);
             report.setLastUpdate(now);
             report.setDeleteFlg(false);
 
             workReportDao.insert(report);
+
+            if ("REFUSED".equals(targetStatus)) {
+                Household hh = siteDao.selectHouseholdById(householdId);
+                if (hh != null) {
+                    hh.setInstallStatus("REFUSED");
+                    siteDao.updateHousehold(hh);
+                }
+            }
+
             AdminService.invalidateDashboardCache();
             return workReportDao.selectReportDetailById(report.getReportId());
         } else {
@@ -97,17 +107,22 @@ public class WorkReportTxService {
             if (photoAfter1 != null) existing.setPhotoAfter1(photoAfter1);
             if (photoBefore2 != null) existing.setPhotoBefore2(photoBefore2);
             if (photoAfter2 != null) existing.setPhotoAfter2(photoAfter2);
-            existing.setStatus("PENDING"); // 수정 제출 시 재검토 대기 상태
+            String targetStatus = (req.getStatus() != null && !req.getStatus().trim().isEmpty()) ? req.getStatus().trim().toUpperCase() : "PENDING";
+            existing.setStatus(targetStatus);
             existing.setRemarks(req.getRemarks());
             existing.setLastUpdate(now);
 
             workReportDao.updateByPrimaryKey(existing);
 
-            // 수정 제출 시 재검토 대기 상태이므로 기존 승인되었던 세대 설치 상태를 UNINSTALLED로 리셋
             Household hh = siteDao.selectHouseholdById(householdId);
-            if (hh != null && "INSTALLED".equals(hh.getInstallStatus())) {
-                hh.setInstallStatus("UNINSTALLED");
-                siteDao.updateHousehold(hh);
+            if (hh != null) {
+                if ("REFUSED".equals(targetStatus)) {
+                    hh.setInstallStatus("REFUSED");
+                    siteDao.updateHousehold(hh);
+                } else if ("INSTALLED".equals(hh.getInstallStatus())) {
+                    hh.setInstallStatus("UNINSTALLED");
+                    siteDao.updateHousehold(hh);
+                }
             }
 
             AdminService.invalidateDashboardCache();

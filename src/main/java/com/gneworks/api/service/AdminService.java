@@ -60,8 +60,7 @@ import com.gneworks.dto.res.core.Information;
 import com.gneworks.common.utils.ExcelStreamingUtil;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,12 +71,6 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
 
 @Service
 @Slf4j
@@ -1207,6 +1200,7 @@ public class AdminService {
                 res.setPendingReports(((Number) reportMap.getOrDefault("pendingReports", 0L)).longValue());
                 res.setRejectedReports(((Number) reportMap.getOrDefault("rejectedReports", 0L)).longValue());
                 res.setCompletedReports(((Number) reportMap.getOrDefault("completedReports", 0L)).longValue());
+                res.setRefusedReports(((Number) reportMap.getOrDefault("refusedReports", 0L)).longValue());
                 res.setIssueReportsCount(((Number) reportMap.getOrDefault("issueReportsCount", 0L)).longValue());
                 res.setCompletedTarget(((Number) reportMap.getOrDefault("completedTarget", 0L)).longValue());
             }
@@ -1229,6 +1223,7 @@ public class AdminService {
                 res.setPendingReports(((Number) reportMap.getOrDefault("pendingReports", 0L)).longValue());
                 res.setRejectedReports(((Number) reportMap.getOrDefault("rejectedReports", 0L)).longValue());
                 res.setCompletedReports(((Number) reportMap.getOrDefault("completedReports", 0L)).longValue());
+                res.setRefusedReports(((Number) reportMap.getOrDefault("refusedReports", 0L)).longValue());
                 res.setIssueReportsCount(((Number) reportMap.getOrDefault("issueReportsCount", 0L)).longValue());
             }
             res.setTotalWorkers(totalWorkers);
@@ -1299,6 +1294,8 @@ public class AdminService {
                     hh.setInstallStatus("INSTALLED");
                 } else if ("REJECTED".equals(newStatus)) {
                     hh.setInstallStatus("HOLD");
+                } else if ("REFUSED".equals(newStatus)) {
+                    hh.setInstallStatus("REFUSED");
                 } else if ("PENDING".equals(newStatus)) {
                     hh.setInstallStatus("UNINSTALLED");
                 } else {
@@ -1308,19 +1305,20 @@ public class AdminService {
             }
         }
 
-        // 상태 변경(확인완료 또는 반려) 시 작업자에게 실시간 SSE 및 웹 푸시 알림 발송 (트랜잭션 커밋 완료 후 안전하게 발송)
-        if (existing.getUserId() != null && !existing.getUserId().trim().isEmpty() && ("COMPLETED".equals(newStatus) || "REJECTED".equals(newStatus))) {
+        // 상태 변경(확인완료 또는 반려 또는 설치거부) 시 작업자에게 실시간 SSE 및 웹 푸시 알림 발송 (트랜잭션 커밋 완료 후 안전하게 발송)
+        if (existing.getUserId() != null && !existing.getUserId().trim().isEmpty() && ("COMPLETED".equals(newStatus) || "REJECTED".equals(newStatus) || "REFUSED".equals(newStatus))) {
             final String targetUserId = existing.getUserId().trim();
             final boolean isApproved = "COMPLETED".equals(newStatus);
-            final String title = isApproved ? "작업 보고서 확인완료" : "작업 보고서 반려";
+            final boolean isRefused = "REFUSED".equals(newStatus);
+            final String title = isApproved ? "작업 보고서 확인완료" : (isRefused ? "작업 보고서 설치거부 처리" : "작업 보고서 반려");
             final String siteName = existing.getSiteName() != null ? existing.getSiteName() : "현장";
-            final String statusText = isApproved ? "확인완료(승인)" : "반려";
+            final String statusText = isApproved ? "확인완료(승인)" : (isRefused ? "설치거부" : "반려");
             final String message = String.format("[%s %s동 %s호] 작업 보고서가 %s되었습니다.%s",
                     siteName,
                     existing.getDong() != null ? existing.getDong() : "",
                     existing.getHo() != null ? existing.getHo() : "",
                     statusText,
-                    (!isApproved && !fixReason.isEmpty()) ? " (사유: " + fixReason + ")" : "");
+                    (!isApproved && !isRefused && !fixReason.isEmpty()) ? " (사유: " + fixReason + ")" : "");
 
             Runnable sendNotificationTask = () -> {
                 try {
@@ -1588,6 +1586,7 @@ public class AdminService {
             String status = res.getInstallStatus().trim().toUpperCase();
             switch (status) {
                 case "INSTALLED" -> res.setInstallStatus("설치완료");
+                case "REFUSED" -> res.setInstallStatus("설치거부");
                 case "UNINSTALLED" -> res.setInstallStatus("미설치");
                 case "SCHEDULED" -> res.setInstallStatus("방문예정");
                 case "HOLD", "ON_HOLD", "ABSENT" -> res.setInstallStatus("부재/보류");
@@ -1602,6 +1601,7 @@ public class AdminService {
             String rStatus = res.getReportStatus().trim().toUpperCase();
             switch (rStatus) {
                 case "COMPLETED" -> res.setReportStatus("확인완료");
+                case "REFUSED" -> res.setReportStatus("설치거부");
                 case "PENDING" -> res.setReportStatus("검토대기");
                 case "REJECTED" -> res.setReportStatus("수정필요");
                 case "UNSUBMITTED" -> res.setReportStatus("미제출");
@@ -1810,12 +1810,26 @@ public class AdminService {
         // 해당 월 기간 내 적재된 소방관할별 최신 통계 스냅샷 조회
         List<RegionDailyStat> statsList = regionDailyStatDao.selectMonthlyStats(startDate, endDate);
 
+        // 해당 기간 동안의 소방관할별 설치거부(REFUSED) 실시간 통계 맵 조회
+        Map<String, Integer> regionalRefusedMap = new HashMap<>();
+        List<Map<String, Object>> refusedList = workReportDao.selectRegionalRefusedSummary(startDate, endDate);
+        if (refusedList != null) {
+            for (Map<String, Object> row : refusedList) {
+                String regId = (String) row.get("regionId");
+                if (regId != null) {
+                    int cnt = ((Number) row.getOrDefault("refusedCount", 0)).intValue();
+                    regionalRefusedMap.put(regId, cnt);
+                }
+            }
+        }
+
         long sumSites = 0;
         long sumTarget = 0;
         long sumCompletedTarget = 0;
         long sumReports = 0;
         long sumCompletedReports = 0;
         long sumPendingReports = 0;
+        long sumRefusedReports = 0;
         long sumIssueReports = 0;
 
         Date latestStatDate = null;
@@ -1835,6 +1849,7 @@ public class AdminService {
                 int reports = s.getTotalReports() != null ? s.getTotalReports() : 0;
                 int completedReports = s.getCompletedReports() != null ? s.getCompletedReports() : 0;
                 int pendingReports = s.getPendingReports() != null ? s.getPendingReports() : 0;
+                int refusedReports = regionalRefusedMap.getOrDefault(s.getRegionId(), 0);
                 int issueReports = s.getIssueReportsCount() != null ? s.getIssueReportsCount() : 0;
 
                 sumSites += sites;
@@ -1843,6 +1858,7 @@ public class AdminService {
                 sumReports += reports;
                 sumCompletedReports += completedReports;
                 sumPendingReports += pendingReports;
+                sumRefusedReports += refusedReports;
                 sumIssueReports += issueReports;
 
                 String sido = s.getSidoName() != null ? s.getSidoName().trim() : "";
@@ -1861,6 +1877,7 @@ public class AdminService {
                         .totalReports(reports)
                         .completedReports(completedReports)
                         .pendingReports(pendingReports)
+                        .refusedReports(refusedReports)
                         .issueReportsCount(issueReports)
                         .build());
             }
@@ -1876,6 +1893,7 @@ public class AdminService {
                 .totalReports(sumReports)
                 .completedReports(sumCompletedReports)
                 .pendingReports(sumPendingReports)
+                .refusedReports(sumRefusedReports)
                 .issueReportsCount(sumIssueReports)
                 .build();
 

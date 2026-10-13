@@ -6,6 +6,7 @@ import com.gneworks.dto.res.AdminWorkerStatRes;
 import com.gneworks.dto.res.WorkReportRes;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -72,4 +73,9 @@ public interface WorkReportMapper {
     );
 
     Map<String, Object> selectNationalReportSummary();
+
+    List<Map<String, Object>> selectRegionalRefusedSummary(
+            @Param("startDate") Date startDate,
+            @Param("endDate") Date endDate
+    );
 }

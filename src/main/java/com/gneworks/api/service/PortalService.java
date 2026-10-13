@@ -695,6 +695,7 @@ public class PortalService {
             res.setPendingReports(((Number) summary.getOrDefault("pendingReports", 0L)).longValue());
             res.setRejectedReports(((Number) summary.getOrDefault("rejectedReports", 0L)).longValue());
             res.setCompletedReports(((Number) summary.getOrDefault("completedReports", 0L)).longValue());
+            res.setRefusedReports(((Number) summary.getOrDefault("refusedReports", 0L)).longValue());
             res.setIssueReportsCount(((Number) summary.getOrDefault("issueReportsCount", 0L)).longValue());
         }
         return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);

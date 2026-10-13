@@ -14,10 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Repository;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Repository
 @Slf4j
@@ -237,6 +234,21 @@ public class WorkReportDao {
             final String methodName = "WorkReportMapper#deleteByPrimaryKey";
             Map<String, Object> paramMap = new HashMap<>();
             paramMap.put("reportId", reportId);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    public List<Map<String, Object>> selectRegionalRefusedSummary(Date startDate, Date endDate) {
+        try {
+            return workReportMapper.selectRegionalRefusedSummary(startDate, endDate);
+        } catch (Exception exception) {
+            final String methodName = "WorkReportMapper#selectRegionalRefusedSummary";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("startDate", startDate);
+            paramMap.put("endDate", endDate);
             String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
             String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
             log.error(overview + detail);
