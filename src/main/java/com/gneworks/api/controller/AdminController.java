@@ -363,8 +363,8 @@ public class AdminController extends BaseController {
      * GET /admin/report/export/excel
      */
     @GetMapping("/report/export/excel")
-    public void exportReportsExcel(AdminReportSearchReq req, HttpServletResponse response) throws IOException {
-        adminService.exportReportsExcel(getCurrentUserId(), req, response);
+    public BaseResponse exportReportsExcel(AdminReportSearchReq req, HttpServletResponse response) throws IOException {
+        return adminService.exportReportsExcel(getCurrentUserId(), req, response);
     }
 
     /**

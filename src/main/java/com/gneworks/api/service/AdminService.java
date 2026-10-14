@@ -1141,12 +1141,17 @@ public class AdminService {
      * 시공 보고서 목록 대용량 엑셀 스트리밍 다운로드
      */
     @Transactional(readOnly = true)
-    public void exportReportsExcel(String operatorUserId, AdminReportSearchReq req, HttpServletResponse response) throws IOException {
+    public BaseResponse exportReportsExcel(String operatorUserId, AdminReportSearchReq req, HttpServletResponse response) throws IOException {
         if (isNotAdmin(operatorUserId)) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "ACCESS_DENIED");
-            return;
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
         }
         if (req == null) req = new AdminReportSearchReq();
+
+        boolean isNational = (req.getRegionId() == null || req.getRegionId().trim().isEmpty() || "ALL".equalsIgnoreCase(req.getRegionId().trim()));
+        if (isNational) {
+            return ResponseUtils.generateDtoFailed(new Information("NATIONAL_EXPORT_RESTRICTED", "서버 과부하 방지를 위해 전국 단위 엑셀 다운로드는 제한됩니다. 관할 지역을 선택해 주세요."));
+        }
+
         req.setSize(null);
         req.setLimit(null);
         List<WorkReportRes> list = workReportDao.selectReportList(req);
@@ -1158,6 +1163,7 @@ public class AdminService {
             list = Collections.emptyList();
         }
         ExcelStreamingUtil.export(response, "시공보고서목록", list, WorkReportRes.class);
+        return null;
     }
 
     /**
