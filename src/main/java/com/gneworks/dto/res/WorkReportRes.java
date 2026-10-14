@@ -47,17 +47,20 @@ public class WorkReportRes extends ResponseData {
 
     private String targetType;
 
+    @ExcelColumn(header = "구분", order = 10, width = 16, align = "CENTER")
+    private String targetTypeFormatted;
+
     private String installDate;
 
-    @ExcelColumn(header = "설치일자", order = 10, width = 14, align = "CENTER")
+    @ExcelColumn(header = "설치일자", order = 11, width = 14, align = "CENTER")
     private String installDateFormatted;
 
-    @ExcelColumn(header = "보고일시", order = 11, width = 18, align = "CENTER")
+    @ExcelColumn(header = "보고일시", order = 12, width = 18, align = "CENTER")
     private String reportTime;
 
     private String submittedAt;
 
-    @ExcelColumn(header = "보고자(설치자)", order = 12, width = 14, align = "CENTER")
+    @ExcelColumn(header = "보고자(설치자)", order = 13, width = 14, align = "CENTER")
     private String reporterName;
 
     private String confirmerName;
@@ -68,15 +71,31 @@ public class WorkReportRes extends ResponseData {
     private String photoBefore2;
     private String photoAfter2;
 
-    @ExcelColumn(header = "상태", order = 13, width = 12, align = "CENTER")
+    @ExcelColumn(header = "상태", order = 14, width = 12, align = "CENTER")
     private String status;
 
-    @ExcelColumn(header = "특이사항", order = 14, width = 30)
+    @ExcelColumn(header = "특이사항", order = 15, width = 30)
     private String remarks;
 
-    @ExcelColumn(header = "수정/반려사유", order = 15, width = 30)
+    @ExcelColumn(header = "수정/반려사유", order = 16, width = 30)
     private String fixReason;
 
     private Date createTime;
     private Date lastUpdate;
+
+    public String getTargetTypeFormatted() {
+        if (targetTypeFormatted != null && !targetTypeFormatted.trim().isEmpty()) {
+            return targetTypeFormatted;
+        }
+        if (targetType != null && !targetType.trim().isEmpty()) {
+            return switch (targetType.trim().toUpperCase()) {
+                case "CHILD" -> "아동(13세 미만)";
+                case "ELDERLY" -> "노인(65세 이상)";
+                case "DISABLED" -> "장애인";
+                case "GENERAL" -> "일반";
+                default -> targetType;
+            };
+        }
+        return "일반";
+    }
 }

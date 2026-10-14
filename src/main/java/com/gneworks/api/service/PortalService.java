@@ -695,6 +695,18 @@ public class PortalService {
         if (res.getSubmittedAt() == null && res.getReportTime() != null) {
             res.setSubmittedAt(res.getReportTime());
         }
+        if (res.getTargetType() != null && !res.getTargetType().trim().isEmpty()) {
+            String type = res.getTargetType().trim().toUpperCase();
+            switch (type) {
+                case "CHILD" -> res.setTargetTypeFormatted("아동(13세 미만)");
+                case "ELDERLY" -> res.setTargetTypeFormatted("노인(65세 이상)");
+                case "DISABLED" -> res.setTargetTypeFormatted("장애인");
+                case "GENERAL" -> res.setTargetTypeFormatted("일반");
+                default -> res.setTargetTypeFormatted(res.getTargetType());
+            }
+        } else {
+            res.setTargetTypeFormatted("일반");
+        }
     }
 
     /**
