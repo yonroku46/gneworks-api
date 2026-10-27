@@ -241,6 +241,20 @@ public class WorkReportDao {
         }
     }
 
+    public int updateByHouseholdId(WorkReport report) {
+        try {
+            return workReportMapper.updateByHouseholdId(report);
+        } catch (Exception exception) {
+            final String methodName = "WorkReportMapper#updateByHouseholdId";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("report", report);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
     public List<Map<String, Object>> selectRegionalRefusedSummary(Date startDate, Date endDate) {
         try {
             return workReportMapper.selectRegionalRefusedSummary(startDate, endDate);

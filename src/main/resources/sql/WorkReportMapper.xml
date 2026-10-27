@@ -138,26 +138,68 @@
   </select>
   <update id="updateByHouseholdId" parameterType="com.gneworks.dao.entity.WorkReport">
     update work_report
-    set site_id = #{siteId,jdbcType=CHAR},
-      user_id = #{userId,jdbcType=CHAR},
-      dong = #{dong,jdbcType=VARCHAR},
-      ho = #{ho,jdbcType=VARCHAR},
-      head_name = #{headName,jdbcType=VARCHAR},
-      install_date = #{installDate,jdbcType=DATE},
-      report_time = #{reportTime,jdbcType=TIMESTAMP},
-      reporter_name = #{reporterName,jdbcType=VARCHAR},
-      confirmer_name = #{confirmerName,jdbcType=VARCHAR},
-      confirmer_signature = #{confirmerSignature,jdbcType=VARCHAR},
-      photo_door = #{photoDoor,jdbcType=VARCHAR},
-      photo_before1 = #{photoBefore1,jdbcType=VARCHAR},
-      photo_after1 = #{photoAfter1,jdbcType=VARCHAR},
-      photo_before2 = #{photoBefore2,jdbcType=VARCHAR},
-      photo_after2 = #{photoAfter2,jdbcType=VARCHAR},
-      `status` = #{status,jdbcType=VARCHAR},
-      remarks = #{remarks,jdbcType=VARCHAR},
-      last_update = #{lastUpdate,jdbcType=TIMESTAMP},
-      delete_flg = #{deleteFlg,jdbcType=BIT},
-      fix_reason = #{fixReason,jdbcType=LONGVARCHAR}
+    <set>
+      <if test="siteId != null and siteId != ''">
+        site_id = #{siteId,jdbcType=CHAR},
+      </if>
+      <if test="userId != null and userId != ''">
+        user_id = #{userId,jdbcType=CHAR},
+      </if>
+      <if test="dong != null and dong != ''">
+        dong = #{dong,jdbcType=VARCHAR},
+      </if>
+      <if test="ho != null and ho != ''">
+        ho = #{ho,jdbcType=VARCHAR},
+      </if>
+      <if test="headName != null and headName != ''">
+        head_name = #{headName,jdbcType=VARCHAR},
+      </if>
+      <if test="installDate != null">
+        install_date = #{installDate,jdbcType=DATE},
+      </if>
+      <if test="reportTime != null">
+        report_time = #{reportTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="reporterName != null">
+        reporter_name = #{reporterName,jdbcType=VARCHAR},
+      </if>
+      <if test="confirmerName != null">
+        confirmer_name = #{confirmerName,jdbcType=VARCHAR},
+      </if>
+      <if test="confirmerSignature != null">
+        confirmer_signature = #{confirmerSignature,jdbcType=VARCHAR},
+      </if>
+      <if test="photoDoor != null">
+        photo_door = #{photoDoor,jdbcType=VARCHAR},
+      </if>
+      <if test="photoBefore1 != null">
+        photo_before1 = #{photoBefore1,jdbcType=VARCHAR},
+      </if>
+      <if test="photoAfter1 != null">
+        photo_after1 = #{photoAfter1,jdbcType=VARCHAR},
+      </if>
+      <if test="photoBefore2 != null">
+        photo_before2 = #{photoBefore2,jdbcType=VARCHAR},
+      </if>
+      <if test="photoAfter2 != null">
+        photo_after2 = #{photoAfter2,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null and status != ''">
+        `status` = #{status,jdbcType=VARCHAR},
+      </if>
+      <if test="remarks != null">
+        remarks = #{remarks,jdbcType=VARCHAR},
+      </if>
+      <if test="lastUpdate != null">
+        last_update = #{lastUpdate,jdbcType=TIMESTAMP},
+      </if>
+      <if test="deleteFlg != null">
+        delete_flg = #{deleteFlg,jdbcType=BIT},
+      </if>
+      <if test="fixReason != null">
+        fix_reason = #{fixReason,jdbcType=LONGVARCHAR},
+      </if>
+    </set>
     where household_id = #{householdId,jdbcType=CHAR}
   </update>
   <select id="selectByHouseholdId" parameterType="java.lang.String" resultMap="BaseResultMap">

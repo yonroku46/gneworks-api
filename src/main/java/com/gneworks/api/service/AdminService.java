@@ -9,12 +9,7 @@ import com.gneworks.dao.InquiryDao;
 import com.gneworks.dao.SiteDao;
 import com.gneworks.dao.UserDao;
 import com.gneworks.dao.WorkReportDao;
-import com.gneworks.dao.entity.FireRegion;
-import com.gneworks.dao.entity.Household;
-import com.gneworks.dao.entity.Inquiry;
-import com.gneworks.dao.entity.Site;
-import com.gneworks.dao.entity.User;
-import com.gneworks.dao.entity.UserAssignedRegion;
+import com.gneworks.dao.entity.*;
 import com.gneworks.dto.req.AdminHouseholdReq;
 import com.gneworks.dto.req.AdminInquiryAnswerReq;
 import com.gneworks.dto.req.AdminInquirySearchReq;
@@ -27,9 +22,7 @@ import com.gneworks.dto.res.ActionRes;
 import com.gneworks.dto.res.AdminImportResultRes;
 import com.gneworks.dto.res.AdminInquiryRes;
 import com.gneworks.dao.WorkReportDeletionLogDao;
-import com.gneworks.dao.entity.WorkReportDeletionLog;
 import com.gneworks.dao.SystemSettingsDao;
-import com.gneworks.dao.entity.SystemSettings;
 import com.gneworks.dto.req.AdminBatchDeleteReportsReq;
 import com.gneworks.dto.req.AdminBatchDeleteSitesReq;
 import com.gneworks.dto.req.AdminDeleteReportReq;
@@ -54,7 +47,6 @@ import com.gneworks.dto.res.UserAssignedRegionDetailRes;
 import com.gneworks.dto.res.WorkReportRes;
 import com.gneworks.dto.res.ServiceStatisticsRes;
 import com.gneworks.dao.RegionDailyStatDao;
-import com.gneworks.dao.entity.RegionDailyStat;
 import com.gneworks.dto.res.core.BaseResponse;
 import com.gneworks.dto.res.core.Information;
 import com.gneworks.common.utils.ExcelStreamingUtil;
@@ -739,6 +731,57 @@ public class AdminService {
         siteDao.deleteHousehold(householdId);
 
         ActionRes res = new ActionRes(householdId);
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
+    }
+
+    /**
+     * 세대 정보 수정
+     */
+    @Transactional
+    public BaseResponse updateHousehold(String operatorUserId, String siteId, String householdId, AdminHouseholdReq req) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "ACCESS_DENIED"));
+        }
+        if (householdId == null || householdId.trim().isEmpty() ||
+            req.getDong() == null || req.getDong().trim().isEmpty() ||
+            req.getHo() == null || req.getHo().trim().isEmpty()) {
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_PARAMETER", "INVALID_PARAMETER"));
+        }
+
+        Household household = siteDao.selectHouseholdById(householdId.trim());
+        if (household == null) {
+            return ResponseUtils.generateDtoFailed(new Information("NOT_FOUND", "HOUSEHOLD_NOT_FOUND"));
+        }
+
+        String updatedDong = req.getDong().trim();
+        String updatedHo = req.getHo().trim();
+        String updatedHeadName = req.getHeadName() != null && !req.getHeadName().trim().isEmpty() ? req.getHeadName().trim() : "세대주";
+
+        household.setDong(updatedDong);
+        household.setHo(updatedHo);
+        household.setHeadName(updatedHeadName);
+        if (req.getTargetType() != null && !req.getTargetType().trim().isEmpty()) {
+            household.setTargetType(req.getTargetType().trim());
+        }
+        if (req.getRemarks() != null) {
+            household.setRemarks(req.getRemarks().trim().isEmpty() ? null : req.getRemarks().trim());
+        }
+        if (req.getInstallStatus() != null && !req.getInstallStatus().trim().isEmpty()) {
+            household.setInstallStatus(req.getInstallStatus().trim());
+        }
+
+        siteDao.updateHousehold(household);
+
+        // 연동된 보고서가 있는 경우 보고서의 동/호수/세대주 동기화
+        WorkReport updateWr = new WorkReport();
+        updateWr.setHouseholdId(householdId.trim());
+        updateWr.setSiteId(siteId);
+        updateWr.setDong(updatedDong);
+        updateWr.setHo(updatedHo);
+        updateWr.setHeadName(updatedHeadName);
+        workReportDao.updateByHouseholdId(updateWr);
+
+        ActionRes res = new ActionRes(household.getHouseholdId());
         return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, res);
     }
 

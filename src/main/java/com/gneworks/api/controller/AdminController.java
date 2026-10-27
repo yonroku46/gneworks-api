@@ -222,6 +222,18 @@ public class AdminController extends BaseController {
         return adminService.deleteHousehold(getCurrentUserId(), siteId, householdId);
     }
 
+    /**
+     * 세대 정보 수정
+     * PUT /admin/site/{siteId}/household/{householdId}
+     */
+    @PutMapping("/site/{siteId}/household/{householdId}")
+    public BaseResponse updateHousehold(
+            @PathVariable("siteId") String siteId,
+            @PathVariable("householdId") String householdId,
+            @RequestBody AdminHouseholdReq req) {
+        return adminService.updateHousehold(getCurrentUserId(), siteId, householdId, req);
+    }
+
     // ── [3. 소방관할 및 관할배정] ──────────────────────────────────
 
     /**
