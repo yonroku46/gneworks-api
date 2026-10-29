@@ -41,6 +41,24 @@ public class RegionDailyStatDao {
     }
 
     /**
+     * 지정 일자의 소방관할별 통계 조회
+     */
+    public List<RegionDailyStat> selectDailyStats(Date statDate) {
+        try {
+            List<RegionDailyStat> list = regionDailyStatMapper.selectDailyStats(statDate);
+            return list != null ? list : Collections.emptyList();
+        } catch (Exception exception) {
+            final String methodName = "RegionDailyStatMapper#selectDailyStats";
+            Map<String, Object> paramMap = new HashMap<>();
+            paramMap.put("statDate", statDate);
+            String overview = messageSource.getMessage(MessageIdConst.E_SQL_ISSUE, null, LocaleAspect.LOCALE);
+            String detail = StringUtils.convertInterfaceErrorMsg(methodName, paramMap, exception);
+            log.error(overview + detail, exception);
+            throw new SystemException(MessageIdConst.E_SQL_ISSUE, overview, detail);
+        }
+    }
+
+    /**
      * 월별 기간 내 소방관할별 통계 집계 조회
      */
     public List<RegionDailyStat> selectMonthlyStats(Date startDate, Date endDate) {

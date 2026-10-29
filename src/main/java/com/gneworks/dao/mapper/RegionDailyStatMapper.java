@@ -37,6 +37,11 @@ public interface RegionDailyStatMapper {
     int upsertDailyStatsForDate(@Param("statDate") Date statDate);
 
     /**
+     * 일별 소방관할 통계 조회
+     */
+    List<RegionDailyStat> selectDailyStats(@Param("statDate") Date statDate);
+
+    /**
      * 월별 기간 내 소방관할별 통계 집계 조회
      */
     List<RegionDailyStat> selectMonthlyStats(@Param("startDate") Date startDate, @Param("endDate") Date endDate);

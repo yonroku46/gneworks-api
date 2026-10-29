@@ -15,6 +15,8 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ServiceStatisticsRes extends ResponseData {
+    private String periodType;
+    private String date;
     private String yearMonth;
     private String baseDate;
     private int totalRegionCount;
@@ -29,6 +31,7 @@ public class ServiceStatisticsRes extends ResponseData {
         private long totalSites;
         private long totalTarget;
         private long completedTarget;
+        private long cumulativeCompletedTarget;
         private int overallProgressRate;
         private long totalReports;
         private long completedReports;
@@ -49,6 +52,7 @@ public class ServiceStatisticsRes extends ResponseData {
         private int totalSites;
         private int totalTarget;
         private int completedTarget;
+        private int cumulativeCompletedTarget;
         private int progressRate;
         private int totalReports;
         private int completedReports;

@@ -485,6 +485,16 @@ public class AdminController extends BaseController {
     // ── [9. 서비스 통계 (일일 집계 기반)] ───────────────────────────────
 
     /**
+     * 일별 소방관할 집계 통계 조회
+     * GET /admin/statistics/daily?date=YYYY-MM-DD
+     */
+    @GetMapping("/statistics/daily")
+    public BaseResponse getDailyStatistics(
+            @RequestParam(value = "date", required = false) String date) {
+        return adminService.getDailyStatistics(getCurrentUserId(), date);
+    }
+
+    /**
      * 월별 소방관할 집계 통계 조회
      * GET /admin/statistics/monthly?yearMonth=YYYY-MM&refresh=false
      */

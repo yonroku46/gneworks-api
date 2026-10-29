@@ -54,15 +54,23 @@ public class RegionDailyStat {
      * Column: completed_target
      * Type: INT
      * Default value: 0
-     * Remark: 설치 완료 세대 수
+     * Remark: 설치 완료 세대 수 (당일 실적)
      */
     private Integer completedTarget;
+
+    /**
+     * Column: cumulative_completed_target
+     * Type: INT
+     * Default value: 0
+     * Remark: 기준일 시점 누적 설치 완료 세대 수
+     */
+    private Integer cumulativeCompletedTarget;
 
     /**
      * Column: total_reports
      * Type: INT
      * Default value: 0
-     * Remark: 누적 제출 확인서 건수
+     * Remark: 누적/당일 제출 확인서 건수
      */
     private Integer totalReports;
 
@@ -81,6 +89,14 @@ public class RegionDailyStat {
      * Remark: 검토 대기 확인서 건수
      */
     private Integer pendingReports;
+
+    /**
+     * Column: refused_reports
+     * Type: INT
+     * Default value: 0
+     * Remark: 설치 거부 건수
+     */
+    private Integer refusedReports;
 
     /**
      * Column: issue_reports_count
@@ -154,6 +170,14 @@ public class RegionDailyStat {
         this.completedTarget = completedTarget;
     }
 
+    public Integer getCumulativeCompletedTarget() {
+        return cumulativeCompletedTarget;
+    }
+
+    public void setCumulativeCompletedTarget(Integer cumulativeCompletedTarget) {
+        this.cumulativeCompletedTarget = cumulativeCompletedTarget;
+    }
+
     public Integer getTotalReports() {
         return totalReports;
     }
@@ -176,6 +200,14 @@ public class RegionDailyStat {
 
     public void setPendingReports(Integer pendingReports) {
         this.pendingReports = pendingReports;
+    }
+
+    public Integer getRefusedReports() {
+        return refusedReports;
+    }
+
+    public void setRefusedReports(Integer refusedReports) {
+        this.refusedReports = refusedReports;
     }
 
     public Integer getIssueReportsCount() {

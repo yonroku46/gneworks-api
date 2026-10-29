@@ -1823,6 +1823,121 @@ public class AdminService {
     }
 
     /**
+     * 일별 소방관할 집계 통계 조회
+     * GET /admin/statistics/daily?date=YYYY-MM-DD
+     */
+    @Transactional
+    public BaseResponse getDailyStatistics(String operatorUserId, String dateStr) {
+        if (isNotAdmin(operatorUserId)) {
+            return ResponseUtils.generateDtoFailed(new Information("ACCESS_DENIED", "FORBIDDEN"));
+        }
+
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+        Date targetDate;
+        try {
+            if (dateStr == null || dateStr.trim().isEmpty()) {
+                // 기본값: 어제 일자 (D-1 마감 기준)
+                Calendar cal = Calendar.getInstance();
+                cal.add(Calendar.DATE, -1);
+                targetDate = cal.getTime();
+                dateStr = sdf.format(targetDate);
+            } else {
+                dateStr = dateStr.trim();
+                targetDate = sdf.parse(dateStr);
+            }
+        } catch (Exception e) {
+            log.error("Invalid date parameter: {}", dateStr, e);
+            return ResponseUtils.generateDtoFailed(new Information("INVALID_PARAMETER", "일자 형식이 올바르지 않습니다 (예: 2026-10-23)"));
+        }
+
+        List<RegionDailyStat> statsList = regionDailyStatDao.selectDailyStats(targetDate);
+
+        long sumSites = 0;
+        long sumTarget = 0;
+        long sumCompletedTarget = 0;
+        long sumCumulativeCompletedTarget = 0;
+        long sumReports = 0;
+        long sumCompletedReports = 0;
+        long sumPendingReports = 0;
+        long sumRefusedReports = 0;
+        long sumIssueReports = 0;
+
+        List<ServiceStatisticsRes.RegionMonthlyStatItem> items = new ArrayList<>();
+        if (statsList != null) {
+            for (RegionDailyStat s : statsList) {
+                int sites = s.getTotalSites() != null ? s.getTotalSites() : 0;
+                int target = s.getTotalTarget() != null ? s.getTotalTarget() : 0;
+                int completedTarget = s.getCompletedTarget() != null ? s.getCompletedTarget() : 0;
+                int cumulativeCompleted = s.getCumulativeCompletedTarget() != null ? s.getCumulativeCompletedTarget() : 0;
+                int rate = target > 0 ? (int) Math.round(((double) cumulativeCompleted / target) * 100) : 0;
+
+                int reports = s.getTotalReports() != null ? s.getTotalReports() : 0;
+                int completedReports = s.getCompletedReports() != null ? s.getCompletedReports() : 0;
+                int pendingReports = s.getPendingReports() != null ? s.getPendingReports() : 0;
+                int refusedReports = s.getRefusedReports() != null ? s.getRefusedReports() : 0;
+                int issueReports = s.getIssueReportsCount() != null ? s.getIssueReportsCount() : 0;
+
+                sumSites += sites;
+                sumTarget += target;
+                sumCompletedTarget += completedTarget;
+                sumCumulativeCompletedTarget += cumulativeCompleted;
+                sumReports += reports;
+                sumCompletedReports += completedReports;
+                sumPendingReports += pendingReports;
+                sumRefusedReports += refusedReports;
+                sumIssueReports += issueReports;
+
+                String sido = s.getSidoName() != null ? s.getSidoName().trim() : "";
+                String rName = s.getName() != null ? s.getName().trim() : "";
+                String displayName = sido + (rName.isEmpty() ? "" : " " + rName);
+
+                items.add(ServiceStatisticsRes.RegionMonthlyStatItem.builder()
+                        .regionId(s.getRegionId())
+                        .sidoName(sido)
+                        .regionName(rName)
+                        .displayName(displayName)
+                        .totalSites(sites)
+                        .totalTarget(target)
+                        .completedTarget(completedTarget)
+                        .cumulativeCompletedTarget(cumulativeCompleted)
+                        .progressRate(rate)
+                        .totalReports(reports)
+                        .completedReports(completedReports)
+                        .pendingReports(pendingReports)
+                        .refusedReports(refusedReports)
+                        .issueReportsCount(issueReports)
+                        .build());
+            }
+        }
+
+        int overallRate = sumTarget > 0 ? (int) Math.round(((double) sumCumulativeCompletedTarget / sumTarget) * 100) : 0;
+
+        ServiceStatisticsRes.Summary summary = ServiceStatisticsRes.Summary.builder()
+                .totalSites(sumSites)
+                .totalTarget(sumTarget)
+                .completedTarget(sumCompletedTarget)
+                .cumulativeCompletedTarget(sumCumulativeCompletedTarget)
+                .overallProgressRate(overallRate)
+                .totalReports(sumReports)
+                .completedReports(sumCompletedReports)
+                .pendingReports(sumPendingReports)
+                .refusedReports(sumRefusedReports)
+                .issueReportsCount(sumIssueReports)
+                .build();
+
+        ServiceStatisticsRes responseData = ServiceStatisticsRes.builder()
+                .periodType("DAILY")
+                .date(dateStr)
+                .baseDate(dateStr)
+                .totalRegionCount(items.size())
+                .summary(summary)
+                .list(items)
+                .build();
+
+        return ResponseUtils.generateDtoSuccess(INFO_SUCCESS, responseData);
+    }
+
+    /**
      * 월별 소방관할 집계 통계 조회
      * GET /admin/statistics/monthly?yearMonth=YYYY-MM
      */
@@ -1855,9 +1970,7 @@ public class AdminService {
         Date today = new Date();
         boolean isCurrentMonth = !endDate.before(today);
 
-        // 당월(진행 중인 달)인 경우:
-        // 통계의 공식 기준일은 오늘 기준 전날(D-1, 어제)입니다.
-        // 어제 일자의 마감 스냅샷이 DB에 존재하지 않으면(스케줄러 미실행 등) 자동으로 어제자 스냅샷을 생성/보정합니다.
+        // 당월인 경우 어제 일자의 마감 스냅샷 유무 확인 및 자동 생성
         if (isCurrentMonth) {
             Calendar cal = Calendar.getInstance();
             cal.setTime(today);
@@ -1871,25 +1984,13 @@ public class AdminService {
             }
         }
 
-        // 해당 월 기간 내 적재된 소방관할별 최신 통계 스냅샷 조회
+        // 해당 월 기간 내 일별 실적 합산(SUM) 및 스톡(MAX) 집계 조회
         List<RegionDailyStat> statsList = regionDailyStatDao.selectMonthlyStats(startDate, endDate);
-
-        // 해당 기간 동안의 소방관할별 설치거부(REFUSED) 실시간 통계 맵 조회
-        Map<String, Integer> regionalRefusedMap = new HashMap<>();
-        List<Map<String, Object>> refusedList = workReportDao.selectRegionalRefusedSummary(startDate, endDate);
-        if (refusedList != null) {
-            for (Map<String, Object> row : refusedList) {
-                String regId = (String) row.get("regionId");
-                if (regId != null) {
-                    int cnt = ((Number) row.getOrDefault("refusedCount", 0)).intValue();
-                    regionalRefusedMap.put(regId, cnt);
-                }
-            }
-        }
 
         long sumSites = 0;
         long sumTarget = 0;
         long sumCompletedTarget = 0;
+        long sumCumulativeCompletedTarget = 0;
         long sumReports = 0;
         long sumCompletedReports = 0;
         long sumPendingReports = 0;
@@ -1908,17 +2009,19 @@ public class AdminService {
                 int sites = s.getTotalSites() != null ? s.getTotalSites() : 0;
                 int target = s.getTotalTarget() != null ? s.getTotalTarget() : 0;
                 int completedTarget = s.getCompletedTarget() != null ? s.getCompletedTarget() : 0;
-                int rate = target > 0 ? (int) Math.round(((double) completedTarget / target) * 100) : 0;
+                int cumulativeCompleted = s.getCumulativeCompletedTarget() != null ? s.getCumulativeCompletedTarget() : 0;
+                int rate = target > 0 ? (int) Math.round(((double) cumulativeCompleted / target) * 100) : 0;
 
                 int reports = s.getTotalReports() != null ? s.getTotalReports() : 0;
                 int completedReports = s.getCompletedReports() != null ? s.getCompletedReports() : 0;
                 int pendingReports = s.getPendingReports() != null ? s.getPendingReports() : 0;
-                int refusedReports = regionalRefusedMap.getOrDefault(s.getRegionId(), 0);
+                int refusedReports = s.getRefusedReports() != null ? s.getRefusedReports() : 0;
                 int issueReports = s.getIssueReportsCount() != null ? s.getIssueReportsCount() : 0;
 
                 sumSites += sites;
                 sumTarget += target;
                 sumCompletedTarget += completedTarget;
+                sumCumulativeCompletedTarget += cumulativeCompleted;
                 sumReports += reports;
                 sumCompletedReports += completedReports;
                 sumPendingReports += pendingReports;
@@ -1937,6 +2040,7 @@ public class AdminService {
                         .totalSites(sites)
                         .totalTarget(target)
                         .completedTarget(completedTarget)
+                        .cumulativeCompletedTarget(cumulativeCompleted)
                         .progressRate(rate)
                         .totalReports(reports)
                         .completedReports(completedReports)
@@ -1947,12 +2051,13 @@ public class AdminService {
             }
         }
 
-        int overallRate = sumTarget > 0 ? (int) Math.round(((double) sumCompletedTarget / sumTarget) * 100) : 0;
+        int overallRate = sumTarget > 0 ? (int) Math.round(((double) sumCumulativeCompletedTarget / sumTarget) * 100) : 0;
 
         ServiceStatisticsRes.Summary summary = ServiceStatisticsRes.Summary.builder()
                 .totalSites(sumSites)
                 .totalTarget(sumTarget)
                 .completedTarget(sumCompletedTarget)
+                .cumulativeCompletedTarget(sumCumulativeCompletedTarget)
                 .overallProgressRate(overallRate)
                 .totalReports(sumReports)
                 .completedReports(sumCompletedReports)
@@ -1966,6 +2071,7 @@ public class AdminService {
                 : null;
 
         ServiceStatisticsRes responseData = ServiceStatisticsRes.builder()
+                .periodType("MONTHLY")
                 .yearMonth(yearMonth)
                 .baseDate(baseDateStr)
                 .totalRegionCount(items.size())

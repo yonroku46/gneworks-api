@@ -10,9 +10,11 @@
     <result column="total_sites" jdbcType="INTEGER" property="totalSites" />
     <result column="total_target" jdbcType="INTEGER" property="totalTarget" />
     <result column="completed_target" jdbcType="INTEGER" property="completedTarget" />
+    <result column="cumulative_completed_target" jdbcType="INTEGER" property="cumulativeCompletedTarget" />
     <result column="total_reports" jdbcType="INTEGER" property="totalReports" />
     <result column="completed_reports" jdbcType="INTEGER" property="completedReports" />
     <result column="pending_reports" jdbcType="INTEGER" property="pendingReports" />
+    <result column="refused_reports" jdbcType="INTEGER" property="refusedReports" />
     <result column="issue_reports_count" jdbcType="INTEGER" property="issueReportsCount" />
     <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
   </resultMap>
@@ -26,13 +28,15 @@
     <!-- @mbg.generated: generated automatically, do not modify! -->
     insert into region_daily_stat (stat_date, region_id, sido_name, 
       `name`, total_sites, total_target, 
-      completed_target, total_reports, completed_reports, 
-      pending_reports, issue_reports_count, create_time
+      completed_target, cumulative_completed_target,
+      total_reports, completed_reports, 
+      pending_reports, refused_reports, issue_reports_count, create_time
       )
     values (#{statDate,jdbcType=DATE}, #{regionId,jdbcType=VARCHAR}, #{sidoName,jdbcType=VARCHAR}, 
       #{name,jdbcType=VARCHAR}, #{totalSites,jdbcType=INTEGER}, #{totalTarget,jdbcType=INTEGER}, 
-      #{completedTarget,jdbcType=INTEGER}, #{totalReports,jdbcType=INTEGER}, #{completedReports,jdbcType=INTEGER}, 
-      #{pendingReports,jdbcType=INTEGER}, #{issueReportsCount,jdbcType=INTEGER}, #{createTime,jdbcType=TIMESTAMP}
+      #{completedTarget,jdbcType=INTEGER}, #{cumulativeCompletedTarget,jdbcType=INTEGER},
+      #{totalReports,jdbcType=INTEGER}, #{completedReports,jdbcType=INTEGER}, 
+      #{pendingReports,jdbcType=INTEGER}, #{refusedReports,jdbcType=INTEGER}, #{issueReportsCount,jdbcType=INTEGER}, #{createTime,jdbcType=TIMESTAMP}
       )
   </insert>
   <update id="updateByPrimaryKey" parameterType="com.gneworks.dao.entity.RegionDailyStat">
@@ -43,9 +47,11 @@
       total_sites = #{totalSites,jdbcType=INTEGER},
       total_target = #{totalTarget,jdbcType=INTEGER},
       completed_target = #{completedTarget,jdbcType=INTEGER},
+      cumulative_completed_target = #{cumulativeCompletedTarget,jdbcType=INTEGER},
       total_reports = #{totalReports,jdbcType=INTEGER},
       completed_reports = #{completedReports,jdbcType=INTEGER},
       pending_reports = #{pendingReports,jdbcType=INTEGER},
+      refused_reports = #{refusedReports,jdbcType=INTEGER},
       issue_reports_count = #{issueReportsCount,jdbcType=INTEGER},
       create_time = #{createTime,jdbcType=TIMESTAMP}
     where stat_date = #{statDate,jdbcType=DATE}
@@ -54,7 +60,7 @@
   <select id="selectByPrimaryKey" parameterType="map" resultMap="BaseResultMap">
     <!-- @mbg.generated: generated automatically, do not modify! -->
     select stat_date, region_id, sido_name, `name`, total_sites, total_target, completed_target, 
-    total_reports, completed_reports, pending_reports, issue_reports_count, create_time
+    cumulative_completed_target, total_reports, completed_reports, pending_reports, refused_reports, issue_reports_count, create_time
     from region_daily_stat
     where stat_date = #{statDate,jdbcType=DATE}
       and region_id = #{regionId,jdbcType=VARCHAR}
@@ -62,16 +68,16 @@
   <select id="selectAll" resultMap="BaseResultMap">
     <!-- @mbg.generated: generated automatically, do not modify! -->
     select stat_date, region_id, sido_name, `name`, total_sites, total_target, completed_target, 
-    total_reports, completed_reports, pending_reports, issue_reports_count, create_time
+    cumulative_completed_target, total_reports, completed_reports, pending_reports, refused_reports, issue_reports_count, create_time
     from region_daily_stat
   </select>
 
-  <!-- 일일 집계 배치용 UPSERT (지정 일자의 소방관할별 통계 스냅샷 생성 및 갱신) -->
+  <!-- 일일 집계 배치용 UPSERT (지정 일자의 소방관할별 당일 실적 및 누적 스냅샷 생성 및 갱신) -->
   <insert id="upsertDailyStatsForDate">
     insert into region_daily_stat (
       stat_date, region_id, sido_name, `name`,
-      total_sites, total_target, completed_target,
-      total_reports, completed_reports, pending_reports,
+      total_sites, total_target, completed_target, cumulative_completed_target,
+      total_reports, completed_reports, pending_reports, refused_reports,
       issue_reports_count, create_time
     )
     select 
@@ -81,10 +87,12 @@
       fr.name,
       coalesce(s_agg.total_sites, 0) as total_sites,
       coalesce(s_agg.total_target, 0) as total_target,
-      coalesce(s_agg.completed_target, 0) as completed_target,
+      coalesce(r_agg.completed_target, 0) as completed_target,
+      coalesce(c_agg.cumulative_completed_target, 0) as cumulative_completed_target,
       coalesce(r_agg.total_reports, 0) as total_reports,
       coalesce(r_agg.completed_reports, 0) as completed_reports,
       coalesce(r_agg.pending_reports, 0) as pending_reports,
+      coalesce(r_agg.refused_reports, 0) as refused_reports,
       coalesce(r_agg.issue_reports_count, 0) as issue_reports_count,
       now() as create_time
     from fire_region fr
@@ -92,64 +100,105 @@
       select 
         s.region_id,
         count(distinct s.site_id) as total_sites,
-        count(h.household_id) as total_target,
-        count(distinct case when wr.status = 'COMPLETED' and wr.delete_flg = 0 then h.household_id end) as completed_target
+        count(h.household_id) as total_target
       from site s
       left join household h on s.site_id = h.site_id
-      left join work_report wr on h.household_id = wr.household_id and wr.delete_flg = 0 and wr.status = 'COMPLETED'
       where s.region_id is not null and s.region_id != ''
       group by s.region_id
     ) s_agg on fr.region_id = s_agg.region_id
     left join (
       select 
-        s.region_id,
+        coalesce(s.region_id, s_hh.region_id) as region_id,
+        count(distinct case when wr.status = 'COMPLETED' then coalesce(wr.household_id, wr.report_id) end) as completed_target,
         count(*) as total_reports,
         count(case when wr.status = 'COMPLETED' then 1 end) as completed_reports,
         count(case when wr.status = 'PENDING' then 1 end) as pending_reports,
+        count(case when wr.status = 'REFUSED' then 1 end) as refused_reports,
         count(case when wr.status = 'PENDING' and wr.remarks is not null and trim(wr.remarks) != '' and wr.remarks not like '%특이사항 없음%' then 1 end) as issue_reports_count
       from work_report wr
-      join site s on wr.site_id = s.site_id
+      left join site s on wr.site_id = s.site_id
+      left join household hh on wr.household_id = hh.household_id
+      left join site s_hh on hh.site_id = s_hh.site_id
       where wr.delete_flg = 0
-        and s.region_id is not null and s.region_id != ''
-      group by s.region_id
+        and date(coalesce(wr.report_time, wr.create_time)) = #{statDate,jdbcType=DATE}
+        and coalesce(s.region_id, s_hh.region_id) is not null 
+        and coalesce(s.region_id, s_hh.region_id) != ''
+      group by coalesce(s.region_id, s_hh.region_id)
     ) r_agg on fr.region_id = r_agg.region_id
+    left join (
+      select 
+        coalesce(s.region_id, s_hh.region_id) as region_id,
+        count(distinct coalesce(wr.household_id, wr.report_id)) as cumulative_completed_target
+      from work_report wr
+      left join site s on wr.site_id = s.site_id
+      left join household hh on wr.household_id = hh.household_id
+      left join site s_hh on hh.site_id = s_hh.site_id
+      where wr.delete_flg = 0
+        and wr.status = 'COMPLETED'
+        and date(coalesce(wr.report_time, wr.create_time)) &lt;= #{statDate,jdbcType=DATE}
+        and coalesce(s.region_id, s_hh.region_id) is not null 
+        and coalesce(s.region_id, s_hh.region_id) != ''
+      group by coalesce(s.region_id, s_hh.region_id)
+    ) c_agg on fr.region_id = c_agg.region_id
     on duplicate key update
       sido_name = values(sido_name),
       `name` = values(`name`),
       total_sites = values(total_sites),
       total_target = values(total_target),
       completed_target = values(completed_target),
+      cumulative_completed_target = values(cumulative_completed_target),
       total_reports = values(total_reports),
       completed_reports = values(completed_reports),
       pending_reports = values(pending_reports),
+      refused_reports = values(refused_reports),
       issue_reports_count = values(issue_reports_count),
       create_time = values(create_time)
   </insert>
 
-  <!-- 월별 소방관할 집계 조회 (기간 내 가장 최신 일자의 스냅샷 레코드 조회) -->
+  <!-- 일별 소방관할 통계 조회 (지정 일자의 레코드 조회) -->
+  <select id="selectDailyStats" resultMap="BaseResultMap">
+    select 
+      stat_date,
+      region_id,
+      sido_name,
+      `name`,
+      total_sites,
+      total_target,
+      completed_target,
+      cumulative_completed_target,
+      total_reports,
+      completed_reports,
+      pending_reports,
+      refused_reports,
+      issue_reports_count,
+      create_time
+    from region_daily_stat
+    where stat_date = #{statDate,jdbcType=DATE}
+    order by sido_name asc, `name` asc
+  </select>
+
+  <!-- 월별 소방관할 집계 조회 (기간 내 일별 실적 합산 SUM 및 스톡 MAX 집계) -->
   <select id="selectMonthlyStats" resultMap="BaseResultMap">
     select 
-      rds.stat_date,
-      rds.region_id,
-      rds.sido_name,
-      rds.`name`,
-      rds.total_sites,
-      rds.total_target,
-      rds.completed_target,
-      rds.total_reports,
-      rds.completed_reports,
-      rds.pending_reports,
-      rds.issue_reports_count,
-      rds.create_time
-    from region_daily_stat rds
-    inner join (
-      select region_id, max(stat_date) as max_stat_date
-      from region_daily_stat
-      where stat_date &gt;= #{startDate,jdbcType=DATE}
-        and stat_date &lt;= #{endDate,jdbcType=DATE}
-      group by region_id
-    ) latest on rds.region_id = latest.region_id and rds.stat_date = latest.max_stat_date
-    order by rds.sido_name asc, rds.`name` asc
+      max(stat_date) as stat_date,
+      region_id,
+      sido_name,
+      `name`,
+      max(total_sites) as total_sites,
+      max(total_target) as total_target,
+      sum(completed_target) as completed_target,
+      max(cumulative_completed_target) as cumulative_completed_target,
+      sum(total_reports) as total_reports,
+      sum(completed_reports) as completed_reports,
+      sum(pending_reports) as pending_reports,
+      sum(refused_reports) as refused_reports,
+      sum(issue_reports_count) as issue_reports_count,
+      max(create_time) as create_time
+    from region_daily_stat
+    where stat_date &gt;= #{startDate,jdbcType=DATE}
+      and stat_date &lt;= #{endDate,jdbcType=DATE}
+    group by region_id, sido_name, `name`
+    order by sido_name asc, `name` asc
   </select>
 
   <!-- 기간 내 집계 레코드 수 확인 -->
